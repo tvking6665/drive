@@ -1,2 +1,3 @@
 streamlit
 pandas
+https://docs.google.com/spreadsheets/d/1_4z6RBNn8HQ1_xfznsITZ0yGWu5xpP-BYDmOdi_ftaE/edit?hl=ko&gid=0#gid=0
