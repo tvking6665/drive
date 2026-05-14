@@ -2,79 +2,86 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 
-# 1. 구글 시트 설정 (본인의 시트 ID로 교체하세요)
+# 1. 확정된 구글 시트 ID 반영
 SHEET_ID = '1_4z6RBNn8HQ1_xfznsITZ0yGWu5xpP-BYDmOdi_ftaE'
 SHEET_URL = f'https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv'
 
 st.set_page_config(page_title="전우정밀 차량 관리", layout="centered")
 
-# --- 데이터 로드 함수 ---
+# --- 데이터 로드 함수 (이력 관리 및 직전 종료거리 로드) ---
 def get_last_dist(car_name):
     try:
+        # 구글 시트에서 실시간으로 데이터 읽기
         df = pd.read_csv(SHEET_URL)
-        # 해당 차량의 마지막 종료거리 추출
+        # 선택된 차량의 가장 마지막 행 데이터 추출
         last_row = df[df['차량'] == car_name].iloc[-1]
         return int(last_row['종료거리'])
     except:
-        return 0 # 기록이 없으면 0 반환
+        # 데이터가 없거나 오류 발생 시 0 반환
+        return 0
 
-# --- UI 구성 ---
 st.title("🚛 차량 운행 기록부")
 
-# 차량 및 운전자 (전우정밀 차량 리스트)
+# --- 1. 차량 선택 (확정된 라인업) ---
 car_list = ["7.5톤(파비스) 3528", "2.5톤(마이티) 8569", "1톤(포터) 5378"]
 selected_car = st.selectbox("차량 선택", car_list)
-driver = st.text_input("운전자", value="조현호")
+
+# --- 2. 운전자 선택 (요청하신 명단 반영) ---
+driver_list = ["김동현", "김태종", "이학장", "직접 입력"]
+selected_driver = st.selectbox("운전자", driver_list)
+if selected_driver == "직접 입력":
+    selected_driver = st.text_input("운전자 성명 입력")
 
 st.divider()
 
-# 경로 설정
-loc_options = ["회사", "전우정밀", "직접 입력"]
+# --- 3. 출발지 및 목적지 설정 (요청 경로 반영) ---
 col1, col2 = st.columns(2)
-with col1:
-    start_node = st.selectbox("📍 출발지", loc_options, index=0)
-    if start_node == "직접 입력": start_node = st.text_input("출발지 입력")
-with col2:
-    end_node = st.selectbox("🎯 목적지", loc_options, index=2)
-    if end_node == "직접 입력": end_node = st.text_input("목적지 입력")
 
-# 거리 입력 (차량 선택 시 자동으로 직전 종료거리 로드)
+with col1:
+    start_options = ["회사(전우정밀)", "직접 입력"]
+    start_node = st.selectbox("📍 출발지", start_options)
+    if start_node == "직접 입력":
+        start_node = st.text_input("출발지 상세 입력")
+
+with col2:
+    end_options = ["왜관(VPHC)", "AST(2공장)", "동아금속", "직접 입력"]
+    end_node = st.selectbox("🎯 목적지", end_options)
+    if end_node == "직접 입력":
+        end_node = st.text_input("목적지 상세 입력")
+
+# --- 4. 거리 입력 (시트에서 불러온 직전 종료거리가 기본값) ---
 last_km = get_last_dist(selected_car)
-c3, c4 = st.columns(2)
-with c3:
+col3, col4 = st.columns(2)
+
+with col3:
     start_km = st.number_input("시작 거리 (km)", value=last_km)
-with c4:
+with col4:
     end_km = st.number_input("종료 거리 (km)", value=start_km)
 
-# 운행 내용
-purpose = st.selectbox("📝 운행 내용", ["납품 및 업무협의", "거래처 미팅", "현장 방문", "기타"])
+# --- 5. 운행 내용 ---
+purpose_list = ["납품 및 업무협의", "거래처 미팅", "현장 방문", "기타"]
+purpose = st.selectbox("📝 운행 내용", purpose_list)
 
 st.divider()
 
-# 저장 버튼
+# --- 6. 저장 및 이력 확인 ---
 if st.button("🚀 운행 기록 저장", use_container_width=True, type="primary"):
     if end_km < start_km:
-        st.error("종료 거리가 시작 거리보다 작습니다!")
+        st.error("종료 거리가 시작 거리보다 작을 수 없습니다!")
+    elif not selected_driver or (selected_driver == "직접 입력" and not selected_driver):
+        st.warning("운전자를 입력해 주세요.")
     else:
-        # 여기에 구글 시트로 데이터를 보내는 링크 생성 (Google Forms 연동 방식 활용 가능)
-        st.success(f"저장 완료! 차량: {selected_car} / 주행: {end_km - start_km}km")
+        total_dist = end_km - start_km
+        st.success(f"입력 확인: {selected_car} | {selected_driver} | {total_dist}km 주행")
         
-        # 입력 데이터 요약 표시
-        new_data = {
-            "날짜": datetime.now().strftime("%Y-%m-%d"),
-            "차량": selected_car,
-            "운전자": driver,
-            "경로": f"{start_node} -> {end_node}",
-            "시작거리": start_km,
-            "종료거리": end_km,
-            "내용": purpose
-        }
-        st.write("저장된 데이터:", new_data)
+        # 현재는 저장 안내 메시지만 표시 (구글 설문지 연동 코드를 추가하여 실제 저장 가능)
+        st.info("데이터가 시트 형식으로 준비되었습니다. (실제 저장을 위해서는 설문지 연동이 필요합니다.)")
 
-# --- 관리자 조회 모드 (하단에 배치) ---
-with st.expander("📊 최근 운행 이력 보기"):
+# --- 하단 이력 조회 섹션 ---
+with st.expander("📊 최근 운행 이력 보기 (최근 10건)"):
     try:
         history_df = pd.read_csv(SHEET_URL)
-        st.dataframe(history_df.tail(10), use_container_width=True)
+        # 시간 역순으로 최근 10개 표시
+        st.dataframe(history_df.tail(10).iloc[::-1], use_container_width=True)
     except:
-        st.write("아직 기록된 데이터가 없습니다.")
+        st.write("구글 시트에서 데이터를 불러올 수 없습니다. 시트 공유 설정을 확인해 주세요.")
