@@ -7,7 +7,7 @@ import json
 # 1. 페이지 및 API 설정
 st.set_page_config(page_title="전우정밀 차량 관리", layout="centered")
 
-# [중요] 여기에 Apps Script에서 복사한 웹 앱 URL을 붙여넣으세요.
+# 복사하신 URL을 아래에 정확히 넣었습니다.
 API_URL = "https://script.google.com/macros/s/AKfycbwh4no_4O6KuHcvWZtcZPuWCkLXlNBU0qy679AifLa9EbXpz1-sjuGTYyzKU1oxJ99l/exec"
 
 # 구글 시트 읽기용 ID
@@ -63,15 +63,12 @@ st.divider()
 purpose = st.selectbox("📝 운행 내용", ["납품 및 업무협의", "통근버스 운행", "거래처 미팅", "현장 방문", "기타"])
 memo = st.text_area("비고 (특이사항)", height=80)
 
-# 6. 저장 기능 (URL 체크 포함)
+# 6. 저장 기능
 if st.button("🚀 운행 기록 저장", use_container_width=True, type="primary"):
-    # URL이 기본 문구 그대로인지 검사
-    if API_URL == "여기에_복사한_URL을_넣으세요" or not API_URL.startswith("http"):
-        st.error("API URL이 설정되지 않았습니다. 코드를 수정하고 저장해 주세요.")
-    elif end_km < start_km:
+    if end_km < start_km:
         st.error("종료 거리를 확인하세요.")
     elif not selected_driver:
-        st.warning("운전자를 확인하세요.")
+        st.warning("운전자를 선택하세요.")
     else:
         payload = {
             "날짜": selected_date.strftime('%Y-%m-%d'),
@@ -91,7 +88,7 @@ if st.button("🚀 운행 기록 저장", use_container_width=True, type="primar
             if response.text == "Success":
                 st.success("✅ 저장 완료!")
                 st.balloons()
-            else: st.error("저장 실패. 스크립트 배포 설정을 확인하세요.")
+            else: st.error("저장 실패. 앱스 스크립트 설정을 확인하세요.")
         except: st.error("네트워크 오류")
 
 with st.expander("📊 최근 기록"):
