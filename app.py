@@ -3,37 +3,53 @@ import pandas as pd
 from datetime import datetime
 from streamlit_gsheets import GSheetsConnection
 
-# 1. 페이지 설정
+# 1. 페이지 설정 및 모바일 최적화 스타일 적용
 st.set_page_config(page_title="전우정밀 차량 관리", layout="centered")
 
-# 2. 구글 시트 연결
+# 모바일에서 글자 크기를 적절하게 줄이는 CSS
+st.markdown("""
+    <style>
+    .main-title {
+        font-size: 24px !important;
+        font-weight: bold;
+        margin-bottom: 10px;
+        display: flex;
+        align-items: center;
+    }
+    .stHeader { font-size: 18px !important; }
+    div[data-testid="stExpander"] p { font-size: 14px !important; }
+    </style>
+    """, unsafe_allow_html=True)
+
+# 2. 전우정밀 로고 배치 (GitHub에 업로드된 logo.png 사용)
+col1, col2 = st.columns([1, 4])
+with col1:
+    try:
+        st.image("logo.png", width=60)
+    except:
+        st.write("🏢") # 로고 로딩 실패 시 아이콘으로 대체
+
+with col2:
+    st.markdown('<p class="main-title">차량 운행 기록부</p>', unsafe_allow_html=True)
+
+# 3. 구글 시트 연결
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-# --- 데이터 로드 함수: 이전 종료거리를 가져옴 ---
 def get_last_dist(car_name):
     try:
-        # 시트에서 실시간으로 데이터 읽기
         df = conn.read()
-        # 선택한 차량의 데이터만 필터링
         car_df = df[df['차량'] == car_name]
         if not car_df.empty:
-            # 마지막 행의 '종료거리' 반환
             return int(car_df.iloc[-1]['종료거리'])
         return 0
     except:
         return 0
 
-# 제목 부분
-st.title("🚛 전우정밀 차량 운행 기록부")
+# 4. 입력 섹션 (모바일에서 보기 좋게 간격 조정)
+selected_date = st.date_input("📅 운행 날짜", datetime.now())
 
-# 3. 기본 정보 입력
-col_date, col_car = st.columns(2)
-with col_date:
-    selected_date = st.date_input("📅 운행 날짜", datetime.now())
-with col_car:
-    # 솔라티(8740) 차량 추가 완료
-    car_list = ["7.5톤(파비스) 3528", "2.5톤(마이티) 8569", "1톤(포터) 5378", "통근차(솔라티) 8740"]
-    selected_car = st.selectbox("🚗 차량 선택", car_list)
+car_list = ["7.5톤(파비스) 3528", "2.5톤(마이티) 8569", "1톤(포터) 5378", "통근차(솔라티) 8740"]
+selected_car = st.selectbox("🚗 차량 선택", car_list)
 
 driver_list = ["김동현", "김태종", "이학장", "직접 입력"]
 selected_driver = st.selectbox("👤 운전자", driver_list)
@@ -42,41 +58,37 @@ if selected_driver == "직접 입력":
 
 st.divider()
 
-# 4. 경로 및 주행 거리
+# 5. 주행 정보
 last_km = get_last_dist(selected_car)
 
-col1, col2 = st.columns(2)
-with col1:
-    start_node = st.selectbox("📍 출발지", ["회사(전우정밀)", "통근노선 시작점", "직접 입력"])
+# 모바일 가로 너비를 고려하여 컬럼 대신 순차 배치하거나 좁은 컬럼 사용
+col_start, col_end = st.columns(2)
+with col_start:
+    start_node = st.selectbox("📍 출발지", ["회사(전우정밀)", "통근노선 시작", "직접 입력"])
     if start_node == "직접 입력": start_node = st.text_input("출발지 상세")
-    start_km = st.number_input("📍 시작 거리 (km)", value=last_km, help="해당 차량의 마지막 기록을 불러왔습니다.")
+    start_km = st.number_input("📍 시작 거리 (km)", value=last_km)
 
-with col2:
-    # 통근차 운영에 맞춰 '통근노선' 목적지 추가
-    end_node = st.selectbox("🎯 목적지", ["왜관(VPHC)", "AST(2공장)", "동아금속", "통근노선(종점)", "직접 입력"])
+with col_end:
+    end_node = st.selectbox("🎯 목적지", ["왜관(VPHC)", "AST(2공장)", "동아금속", "통근노선 종점", "직접 입력"])
     if end_node == "직접 입력": end_node = st.text_input("목적지 상세")
     end_km = st.number_input("🏁 종료 거리 (km)", value=start_km)
 
 st.divider()
 
-# 5. 운행 내용 및 비고
-# 통근운행 항목 추가
+# 6. 운행 내용
 purpose = st.selectbox("📝 운행 내용", ["납품 및 업무협의", "통근버스 운행", "거래처 미팅", "현장 방문", "기타"])
-memo = st.text_area("비고 (특이사항)", placeholder="주유 기록이나 차량 상태, 통근 인원 등을 적어주세요.")
+memo = st.text_area("비고 (특이사항)", height=100)
 
 total_distance = end_km - start_km
-if total_distance > 0:
-    st.info(f"이번 주행 거리: {total_distance} km")
 
-# 6. 저장 버튼
-if st.button("🚀 운행 기록 저장", use_container_width=True, type="primary"):
+# 7. 저장 버튼
+if st.button("🚀 기록 저장", use_container_width=True, type="primary"):
     if end_km < start_km:
-        st.error("종료 거리가 시작 거리보다 작을 수 없습니다!")
+        st.error("종료 거리가 더 작습니다!")
     elif not selected_driver:
-        st.warning("운전자를 입력해 주세요.")
+        st.warning("운전자를 확인하세요.")
     else:
         try:
-            # 시트 업데이트용 데이터 프레임 생성
             new_data = pd.DataFrame([{
                 "날짜": selected_date.strftime('%Y-%m-%d'),
                 "차량": selected_car,
@@ -90,21 +102,18 @@ if st.button("🚀 운행 기록 저장", use_container_width=True, type="primar
                 "비고": memo,
                 "입력시간": datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             }])
-            
-            # 구글 시트에 저장
             existing_df = conn.read()
             updated_df = pd.concat([existing_df, new_data], ignore_index=True)
             conn.update(data=updated_df)
-            
-            st.success(f"✅ {selected_car} 운행 기록이 시트에 저장되었습니다!")
+            st.success("저장 완료!")
             st.balloons()
         except Exception as e:
-            st.error(f"저장 중 오류 발생: {e}")
+            st.error(f"오류: {e}")
 
-# 7. 하단 이력 조회
-with st.expander("📊 최근 운행 이력 보기"):
+# 이력 조회 (폰트 크기 조절됨)
+with st.expander("📊 최근 기록 보기"):
     try:
         history_df = conn.read()
-        st.dataframe(history_df.tail(10).iloc[::-1], use_container_width=True)
+        st.dataframe(history_df.tail(5).iloc[::-1], use_container_width=True)
     except:
-        st.write("데이터를 불러오는 중입니다. 첫 기록을 저장하면 표시됩니다.")
+        st.write("데이터가 없습니다.")
