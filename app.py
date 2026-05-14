@@ -8,7 +8,7 @@ import json
 st.set_page_config(page_title="전우정밀 차량 관리", layout="centered")
 
 # [중요] 여기에 Apps Script에서 복사한 웹 앱 URL을 붙여넣으세요.
-API_URL = "[https://script.google.com/macros/s/AKfycbwh4no_4O6KuHcvWZtcZPuWCkLXlNBU0qy679AifLa9EbXpz1-sjuGTYyzKU1oxJ99l/exec]"
+API_URL = "https://script.google.com/macros/s/AKfycbwh4no_4O6KuHcvWZtcZPuWCkLXlNBU0qy679AifLa9EbXpz1-sjuGTYyzKU1oxJ99l/exec"
 
 # 구글 시트 읽기용 ID
 SHEET_ID = '1_4z6RBNn8HQ1_xfznsITZ0yGWu5xpP-BYDmOdi_ftaE'
