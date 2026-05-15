@@ -3,10 +3,10 @@ import pandas as pd
 from datetime import datetime
 from streamlit_gsheets import GSheetsConnection
 
-# 페이지 설정
-st.set_page_config(page_title="전우정밀 차량/연료 관리", layout="centered")
+# 1. 페이지 설정
+st.set_page_config(page_title="전우정밀 차량 관리", layout="centered")
 
-# 헤더 디자인
+# 2. 헤더 구성
 col1, col2 = st.columns([1, 4])
 with col1:
     try: st.image("logo.png", width=60)
@@ -14,10 +14,9 @@ with col1:
 with col2:
     st.markdown('<h2 style="margin-top:0;">차량 운행 및 연료 기록부</h2>', unsafe_allow_html=True)
 
-# 구글 시트 연결
+# 3. 구글 시트 연결
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-# 마지막 종료 거리 호출 함수
 def get_last_dist(car_name):
     try:
         df = conn.read(ttl=0)
@@ -27,7 +26,7 @@ def get_last_dist(car_name):
         return 0
     except: return 0
 
-# --- 입력 섹션 ---
+# 4. 입력 섹션
 selected_date = st.date_input("📅 날짜", datetime.now())
 car_list = ["7.5톤(파비스) 3528", "2.5톤(마이티) 8569", "1톤(포터) 5378", "통근차(솔라티) 8740"]
 selected_car = st.selectbox("🚗 차량 선택", car_list)
@@ -37,7 +36,7 @@ if selected_driver == "직접 입력":
 
 st.divider()
 
-# 주행 거리 입력 (5:5 배치)
+# 주행 거리 (5:5 배치)
 last_km = get_last_dist(selected_car)
 c1, c2 = st.columns(2)
 with c1:
@@ -51,30 +50,28 @@ with c2:
 
 st.divider()
 
-# 연료 주입 섹션
-fuel_needed = st.checkbox("⛽ 오늘 연료나 요소수를 주입했나요?")
+# 5. 연료 주입 정보
+fuel_needed = st.checkbox("⛽ 연료/요소수 주입 시 체크")
 f_type, f_amt, f_cost = "-", 0, 0
-
 if fuel_needed:
     fc1, fc2, fc3 = st.columns(3)
     with fc1: f_type = st.selectbox("종류", ["LPi", "경유", "요소수"])
     with fc2:
-        l_text = "주입금액(원)" if f_type == "LPi" else "주입량(L)"
-        f_amt = st.number_input(l_text, min_value=0)
+        l_label = "주입금액(원)" if f_type == "LPi" else "주입량(L)"
+        f_amt = st.number_input(l_label, min_value=0)
     with fc3: f_cost = st.number_input("결제 총액(원)", min_value=0)
 
 st.divider()
-
 purpose = st.selectbox("📝 운행 내용", ["납품 및 업무협의", "통근버스 운행", "거래처 미팅", "기타"])
 memo = st.text_area("비고 (특이사항)")
 
-# --- 저장 로직 ---
+# 6. 저장 로직 (배열 순서 일치)
 if st.button("🚀 기록 저장", use_container_width=True, type="primary"):
     if end_km < start_km:
-        st.error("종료 거리가 시작 거리보다 작습니다!")
+        st.error("종료 거리가 시작 거리보다 작을 수 없습니다!")
     else:
         try:
-            # 시트 열 순서와 100% 일치하도록 구성
+            # 이미지 시트 헤더 순서와 동일하게 구성
             new_row = pd.DataFrame([{
                 "날짜": selected_date.strftime('%Y-%m-%d'),
                 "차량": selected_car,
@@ -92,20 +89,19 @@ if st.button("🚀 기록 저장", use_container_width=True, type="primary"):
                 "결제금액": f_cost
             }])
             
-            existing_df = conn.read(ttl=0)
-            updated_df = pd.concat([existing_df, new_row], ignore_index=True)
-            conn.update(data=updated_df)
+            df_existing = conn.read(ttl=0)
+            df_updated = pd.concat([df_existing, new_row], ignore_index=True)
+            conn.update(data=df_updated)
             
-            st.success("기록이 성공적으로 저장되었습니다!")
+            st.success("저장 완료!")
             st.balloons()
             st.rerun()
         except Exception as e:
-            st.error(f"저장 중 오류 발생: {e}")
-            st.info("💡 구글 시트 공유에서 'streamlit-gsheets-service-account...' 이메일을 편집자로 추가했는지 확인하세요.")
+            st.error(f"저장 실패: {e}")
+            st.info("💡 구글 시트 공유 설정에서 서비스 계정 이메일을 추가했는지 확인해 주세요.")
 
-# 최근 기록 보기
-with st.expander("📊 최근 기록"):
+with st.expander("📊 최근 기록 보기"):
     try:
-        df_hist = conn.read(ttl=0)
-        st.dataframe(df_hist.tail(5).iloc[::-1], use_container_width=True)
+        df_view = conn.read(ttl=0)
+        st.dataframe(df_view.tail(5).iloc[::-1], use_container_width=True)
     except: st.write("데이터가 없습니다.")
