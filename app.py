@@ -54,15 +54,13 @@ if fuel_needed:
 purpose = st.selectbox("📝 운행 내용", ["납품 및 업무협의", "통근버스 운행", "기타"])
 memo = st.text_area("비고 (특이사항)")
 
-# 5. 저장 로직 (비고란에 연료 정보 합치기)
+# 5. 저장 로직 (괄호 닫힘 완벽 확인)
 if st.button("🚀 기록 저장", use_container_width=True, type="primary"):
     if end_km < start_km:
         st.error("종료 거리가 시작 거리보다 작습니다!")
     else:
         try:
-            # 연료 정보와 메모를 하나로 합침
             combined_memo = f_info + memo
-            
             new_row = pd.DataFrame([{
                 "날짜": selected_date.strftime('%Y-%m-%d'),
                 "차량": selected_car,
@@ -76,4 +74,19 @@ if st.button("🚀 기록 저장", use_container_width=True, type="primary"):
             }])
             
             existing_df = conn.read(ttl=0)
-            updated_df = pd.concat([existing_df, new_row], ignore
+            # 괄호가 정확히 닫혔는지 확인 (아래 줄)
+            updated_df = pd.concat([existing_df, new_row], ignore_index=True)
+            conn.update(data=updated_df)
+            
+            st.success("성공적으로 저장되었습니다!")
+            st.balloons()
+            st.rerun()
+        except Exception as e:
+            st.error(f"저장 실패: {e}")
+
+# 6. 최근 기록 보기
+with st.expander("📊 최근 기록"):
+    try:
+        df_hist = conn.read(ttl=0)
+        st.dataframe(df_hist.tail(5).iloc[::-1], use_container_width=True)
+    except: st.write("조회 불가")
