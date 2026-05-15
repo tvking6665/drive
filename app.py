@@ -6,14 +6,7 @@ from streamlit_gsheets import GSheetsConnection
 # 1. 페이지 설정
 st.set_page_config(page_title="전우정밀 차량 관리", layout="centered")
 
-# 사용자 정의 스타일
-st.markdown("""
-    <style>
-    .main-title { font-size: 24px !important; font-weight: bold; margin-bottom: 10px; display: flex; align-items: center; }
-    </style>
-    """, unsafe_allow_html=True)
-
-# 2. 로고 및 제목
+# 2. 제목 및 로고
 col1, col2 = st.columns([1, 4])
 with col1:
     try:
@@ -21,19 +14,17 @@ with col1:
     except:
         st.write("🏢")
 with col2:
-    st.markdown('<p class="main-title">차량 운행 기록부</p>', unsafe_allow_html=True)
+    st.markdown('<h2 style="margin: #000000;">차량 운행 기록부</h2>', unsafe_allow_html=True)
 
 # 3. 구글 시트 연결
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 def get_last_dist(car_name):
     try:
-        # 실시간 데이터를 가져오기 위해 ttl=0 설정
         df = conn.read(ttl=0)
         car_df = df[df['차량'] == car_name]
         if not car_df.empty:
             val = car_df.iloc[-1]['종료거리']
-            # 숫자가 아닌 값이 섞여있을 경우를 대비해 숫자로 변환
             num_val = pd.to_numeric(val, errors='coerce')
             return int(num_val) if pd.notnull(num_val) else 0
         return 0
@@ -68,4 +59,45 @@ st.divider()
 
 # 6. 운행 내용 및 비고
 purpose = st.selectbox("📝 운행 내용", ["납품 및 업무협의", "통근버스 운행", "거래처 미팅", "현장 방문", "기타"])
-memo = st.text_area("비고
+memo = st.text_area("비고 (특이사항)", height=100)
+total_distance = end_km - start_km
+
+# 7. 저장 로직
+if st.button("🚀 기록 저장", use_container_width=True, type="primary"):
+    if end_km < start_km:
+        st.error("종료 거리가 시작 거리보다 작을 수 없습니다!")
+    else:
+        try:
+            new_data = pd.DataFrame([{
+                "날짜": selected_date.strftime('%Y-%m-%d'),
+                "차량": selected_car,
+                "운전자": selected_driver,
+                "출발지": start_node,
+                "목적지": end_node,
+                "시작거리": start_km,
+                "종료거리": end_km,
+                "주행거리": total_distance,
+                "운행내용": purpose,
+                "비고": memo,
+                "입력시간": datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            }])
+            
+            existing_df = conn.read(ttl=0)
+            updated_df = pd.concat([existing_df, new_data], ignore_index=True)
+            conn.update(data=updated_df)
+            
+            st.success("성공적으로 저장되었습니다!")
+            st.balloons()
+            st.rerun()
+            
+        except Exception as e:
+            st.error(f"저장 실패: {e}")
+            st.info("💡 구글 시트 [공유] 설정에서 '편집자' 권한이 있는지 꼭 확인하세요.")
+
+# 최근 기록 조회
+with st.expander("📊 최근 기록 보기"):
+    try:
+        history_df = conn.read(ttl=0)
+        st.dataframe(history_df.tail(5).iloc[::-1], use_container_width=True)
+    except:
+        st.write("데이터가 없습니다.")
