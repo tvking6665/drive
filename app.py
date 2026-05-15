@@ -89,7 +89,7 @@ purpose = st.selectbox("📝 운행 내용", ["납품 및 업무협의", "통근
 memo = st.text_area("비고 (특이사항)", height=100)
 total_distance = end_km - start_km
 
-# 8. 저장 로직 (이미지의 모든 열 순서와 일치)
+# 8. 저장 로직 (권한 오류 해결 버전)
 if st.button("🚀 기록 저장", use_container_width=True, type="primary"):
     if end_km < start_km:
         st.error("종료 거리가 시작 거리보다 작을 수 없습니다!")
@@ -97,7 +97,8 @@ if st.button("🚀 기록 저장", use_container_width=True, type="primary"):
         st.warning("운전자를 확인하세요.")
     else:
         try:
-            new_data = pd.DataFrame([{
+            # 신규 데이터 생성
+            new_row = {
                 "날짜": selected_date.strftime('%Y-%m-%d'),
                 "차량": selected_car,
                 "운전자": selected_driver,
@@ -112,16 +113,22 @@ if st.button("🚀 기록 저장", use_container_width=True, type="primary"):
                 "운행내용": purpose,
                 "비고": memo,
                 "입력시간": datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            }])
+            }
             
-            existing_df = conn.read()
-            updated_df = pd.concat([existing_df, new_data], ignore_index=True)
+            # [수정된 부분] 명시적으로 데이터프레임을 읽어와서 합친 후 다시 씁니다.
+            existing_df = conn.read(ttl=0) # 캐시 없이 즉시 읽기
+            updated_df = pd.concat([existing_df, pd.DataFrame([new_row])], ignore_index=True)
+            
+            # 다시 쓰기 시도
             conn.update(data=updated_df)
             
             st.success("저장 완료!")
             st.balloons()
+            st.rerun() # 저장 후 화면 갱신
+            
         except Exception as e:
-            st.error(f"오류: {e}")
+            st.error(f"저장 실패: {e}")
+            st.info("💡 만약 이 오류가 계속된다면, Streamlit Cloud의 'Secrets' 설정에서 시트 URL이 정확한지 확인이 필요합니다.")
 
 # 9. 최근 기록 보기
 with st.expander("📊 최근 기록 보기"):
