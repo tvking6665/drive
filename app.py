@@ -6,87 +6,66 @@ from streamlit_gsheets import GSheetsConnection
 # 1. 페이지 설정
 st.set_page_config(page_title="전우정밀 차량 관리", layout="centered")
 
-# 2. 제목
-st.markdown('<h2 style="text-align: center;">🚗 차량 운행 기록부 (비고 통합형)</h2>', unsafe_allow_html=True)
+# 사용자 정의 스타일
+st.markdown("""
+    <style>
+    .main-title { font-size: 24px !important; font-weight: bold; margin-bottom: 10px; display: flex; align-items: center; }
+    </style>
+    """, unsafe_allow_html=True)
+
+# 2. 로고 및 제목
+col1, col2 = st.columns([1, 4])
+with col1:
+    try:
+        st.image("logo.png", width=60)
+    except:
+        st.write("🏢")
+with col2:
+    st.markdown('<p class="main-title">차량 운행 기록부</p>', unsafe_allow_html=True)
 
 # 3. 구글 시트 연결
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 def get_last_dist(car_name):
     try:
+        # 실시간 데이터를 가져오기 위해 ttl=0 설정
         df = conn.read(ttl=0)
         car_df = df[df['차량'] == car_name]
         if not car_df.empty:
             val = car_df.iloc[-1]['종료거리']
-            return int(pd.to_numeric(val, errors='coerce')) if pd.notnull(pd.to_numeric(val, errors='coerce')) else 0
+            # 숫자가 아닌 값이 섞여있을 경우를 대비해 숫자로 변환
+            num_val = pd.to_numeric(val, errors='coerce')
+            return int(num_val) if pd.notnull(num_val) else 0
         return 0
-    except: return 0
+    except:
+        return 0
 
-# 4. 입력 섹션
-selected_date = st.date_input("📅 날짜", datetime.now())
+# 4. 운행 정보 입력
+selected_date = st.date_input("📅 운행 날짜", datetime.now())
 car_list = ["7.5톤(파비스) 3528", "2.5톤(마이티) 8569", "1톤(포터) 5378", "통근차(솔라티) 8740"]
 selected_car = st.selectbox("🚗 차량 선택", car_list)
+
 selected_driver = st.selectbox("👤 운전자", ["김동현", "김태종", "이학장", "직접 입력"])
-if selected_driver == "직접 입력": selected_driver = st.text_input("운전자 성명")
+if selected_driver == "직접 입력":
+    selected_driver = st.text_input("운전자 성명 입력")
 
 st.divider()
 
+# 5. 주행 거리 입력
 last_km = get_last_dist(selected_car)
-c1, c2 = st.columns(2)
-with c1:
+col_start, col_end = st.columns(2)
+with col_start:
+    start_node = st.selectbox("📍 출발지", ["회사(전우정밀)", "통근노선 시작", "직접 입력"])
+    if start_node == "직접 입력": start_node = st.text_input("출발지 상세")
     start_km = st.number_input("📍 시작 거리 (km)", value=int(last_km))
-with c2:
+
+with col_end:
+    end_node = st.selectbox("🎯 목적지", ["왜관(VPHC)", "AST(2공장)", "동아금속", "통근노선 종점", "직접 입력"])
+    if end_node == "직접 입력": end_node = st.text_input("목적지 상세")
     end_km = st.number_input("🏁 종료 거리 (km)", value=int(start_km))
 
 st.divider()
 
-# 연료 주입 정보 (체크 시 비고란에 자동 합산)
-fuel_needed = st.checkbox("⛽ 연료/요소수를 주입했나요?")
-f_info = ""
-if fuel_needed:
-    fc1, fc2 = st.columns(2)
-    with fc1: f_type = st.selectbox("종류", ["LPi", "경유", "요소수"])
-    with fc2:
-        unit = "원" if f_type == "LPi" else "L"
-        f_amt = st.number_input(f"주입량 ({unit})", min_value=0)
-    f_info = f"[{f_type} 주입: {f_amt}{unit}] "
-
-purpose = st.selectbox("📝 운행 내용", ["납품 및 업무협의", "통근버스 운행", "기타"])
-memo = st.text_area("비고 (특이사항)")
-
-# 5. 저장 로직 (괄호 닫힘 완벽 확인)
-if st.button("🚀 기록 저장", use_container_width=True, type="primary"):
-    if end_km < start_km:
-        st.error("종료 거리가 시작 거리보다 작습니다!")
-    else:
-        try:
-            combined_memo = f_info + memo
-            new_row = pd.DataFrame([{
-                "날짜": selected_date.strftime('%Y-%m-%d'),
-                "차량": selected_car,
-                "운전자": selected_driver,
-                "시작거리": start_km,
-                "종료거리": end_km,
-                "주행거리": end_km - start_km,
-                "운행내용": purpose,
-                "비고": combined_memo,
-                "입력시간": datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            }])
-            
-            existing_df = conn.read(ttl=0)
-            # 괄호가 정확히 닫혔는지 확인 (아래 줄)
-            updated_df = pd.concat([existing_df, new_row], ignore_index=True)
-            conn.update(data=updated_df)
-            
-            st.success("성공적으로 저장되었습니다!")
-            st.balloons()
-            st.rerun()
-        except Exception as e:
-            st.error(f"저장 실패: {e}")
-
-# 6. 최근 기록 보기
-with st.expander("📊 최근 기록"):
-    try:
-        df_hist = conn.read(ttl=0)
-        st.dataframe(df_hist.tail(5).iloc[::-1], use_container_width=True)
-    except: st.write("조회 불가")
+# 6. 운행 내용 및 비고
+purpose = st.selectbox("📝 운행 내용", ["납품 및 업무협의", "통근버스 운행", "거래처 미팅", "현장 방문", "기타"])
+memo = st.text_area("비고
