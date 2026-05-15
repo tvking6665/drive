@@ -9,8 +9,10 @@ st.set_page_config(page_title="전우정밀 차량 관리 시스템", layout="ce
 # 2. 로고 및 제목
 col1, col2 = st.columns([1, 4])
 with col1:
-    try: st.image("logo.png", width=60)
-    except: st.write("🏢")
+    try:
+        st.image("logo.png", width=60)
+    except:
+        st.write("🏢")
 with col2:
     st.markdown('<h2 style="margin: 0;">차량 운행 기록부</h2>', unsafe_allow_html=True)
 
@@ -42,7 +44,7 @@ if selected_driver == "직접 입력":
 
 st.divider()
 
-# 5. 주행 거리 및 목적지 입력 (누락되었던 부분 복구)
+# 5. 주행 거리 및 목적지 입력
 last_km = get_last_dist(selected_car)
 col_start, col_end = st.columns(2)
 
@@ -65,7 +67,7 @@ purpose = st.selectbox("📝 운행 내용", ["납품 및 업무협의", "통근
 memo = st.text_area("비고 (특이사항)", height=100)
 total_distance = end_km - start_km
 
-# 7. 저장 로직 (권한 오류 방지용)
+# 7. 저장 로직
 if st.button("🚀 기록 저장", use_container_width=True, type="primary"):
     if end_km < start_km:
         st.error("종료 거리가 시작 거리보다 작을 수 없습니다!")
@@ -99,7 +101,7 @@ if st.button("🚀 기록 저장", use_container_width=True, type="primary"):
             
         except Exception as e:
             st.error(f"저장 실패: {e}")
-            st.warning("⚠️ 구글 시트 상단 [공유] 버튼에서 아래 이메일이 [편집자]인지 확인해 주세요.")
+            st.info("💡 구글 시트 상단 [공유] 버튼에서 아래 이메일이 [편집자]인지 확인해 주세요.")
             st.code("streamlit-gsheets-service-account@streamlit-gsheets.iam.gserviceaccount.com")
 
 # 최근 기록 조회
