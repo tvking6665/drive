@@ -7,7 +7,15 @@ from streamlit_gsheets import GSheetsConnection
 st.set_page_config(page_title="전우정밀 차량관리", layout="centered")
 st.markdown("### 🚗 차량 운행 기록부 (새 시트)")
 
-# 2. 구글 시트 연결
+# 🌟 [오류 해결 핵심] Secrets의 private_key 줄바꿈 문자 강제 교정 로직
+if "connections" in st.secrets and "gsheets" in st.secrets["connections"]:
+    if "private_key" in st.secrets["connections"]["gsheets"]:
+        orig_key = st.secrets["connections"]["gsheets"]["private_key"]
+        # 깨진 줄바꿈이나 문자열 내 실제 \n 텍스트를 파이썬이 읽을 수 있는 줄바꿈으로 변경
+        if "\\n" in orig_key:
+            st.secrets["connections"]["gsheets"]["private_key"] = orig_key.replace("\\n", "\n")
+
+# 2. 구글 시트 연결 (안전하게 교정된 Secrets 적용)
 url = "https://docs.google.com/spreadsheets/d/1GdHg3aKD2OXEdUx6NhLK7kOQE-uWA5JGHzmqQE1SMRw/edit?gid=0#gid=0"
 conn = st.connection("gsheets", type=GSheetsConnection)
 
@@ -43,12 +51,10 @@ with c1:
     s_km = st.number_input("시작거리(km)", value=int(last_km))
 
 with c2:
-    # 🌟 목적지를 드롭박스(Selectbox)로 변경
-    # 자주 가시는 고객사나 목적지 목록을 아래 리스트에 넣어주세요.
-    node_list = ["VPHC", "AST", "AST2공장", "동아금속", "동진도금", "한국하이테크", "송원테크", "구산", "직접입력"]
+    # 엑셀 드롭다운 목록 반영
+    node_list = ["회사", "A사", "B사", "C사", "D사", "직접입력"]
     e_node = st.selectbox("🎯 목적지 선택", node_list)
     
-    # "직접입력"을 선택했을 때만 텍스트 입력창이 열리도록 처리
     if e_node == "직접입력":
         e_node = st.text_input("목적지 직접 입력", placeholder="예: 대구공장")
         
@@ -61,7 +67,6 @@ m = st.text_area("비고(특이사항)")
 
 # 4. 저장 로직
 if st.button("🚀 기록 저장", use_container_width=True, type="primary"):
-    # 목적지가 빈값인지 검증 (직접 입력창에서 아무것도 안 적었을 때 방지)
     if not e_node or e_node.strip() == "":
         st.error("목적지를 선택하거나 입력해 주세요!")
     elif e_km < s_km:
@@ -87,13 +92,12 @@ if st.button("🚀 기록 저장", use_container_width=True, type="primary"):
             
             conn.update(spreadsheet=url, data=df_final)
             
-            st.success("새 시트에 성공적으로 저장되었습니다!")
+            st.success("성공적으로 저장되었습니다!")
             st.balloons()
             st.rerun()
             
         except Exception as e:
             st.error(f"저장 실패: {e}")
-            st.info("💡 새 시트의 [공유] 버튼을 눌러 서비스 계정을 '편집자'로 추가했는지 꼭 확인하세요.")
 
 # 최근 기록 보기
 with st.expander("📊 최근 기록 확인"):
