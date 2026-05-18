@@ -38,6 +38,13 @@ CAR_MAP = {
 }
 REVERSE_CAR_MAP = {v: k for k, v in CAR_MAP.items()}
 
+# 운전자별 기본 매핑 차량 설정
+DRIVER_DEFAULT_CAR = {
+    "김동현": "7.5톤",
+    "김태종": "1톤",
+    "이학장": "1톤"
+}
+
 def check_login():
     if "login_success" not in st.session_state:
         st.session_state.login_success = False
@@ -109,18 +116,31 @@ if check_login():
             return ['background-color: #fff9c4; color: black; font-weight: bold;'] * len(row)
         return [''] * len(row)
 
+    # UI 구성을 위한 세션 상태 초기화 (운전자 변경 감지용)
+    if "prev_driver" not in st.session_state:
+        st.session_state.prev_driver = ""
+
     # 입력 UI 구성
     selected_date = st.date_input("📅 운행 및 주유 날짜", datetime.now())
-    ui_car_list = ["7.5톤", "2.5톤", "1톤", "통근차"]
-    selected_car_ui = st.selectbox("🚗 차량 선택", ui_car_list)
     
-    actual_car_name = CAR_MAP[selected_car_ui]
-
+    # [변경] 운전자 선택을 차량 선택보다 위로 배치하여 연동이 자연스럽게 보이도록 수정
     selected_driver = st.session_state.user_name if st.session_state.user_name != "관리자" else "직접 입력"
     if selected_driver == "직접 입력":
         selected_driver = st.selectbox("👤 운전자 선택", ["김동현", "김태종", "이학장", "직접 입력"])
         if selected_driver == "직접 입력":
             selected_driver = st.text_input("운전자 성명 입력")
+
+    # 운전자가 바뀐 경우 매핑된 기본 차량의 index 번호를 찾음
+    ui_car_list = ["7.5톤", "2.5톤", "1톤", "통근차"]
+    default_car_index = 0
+    
+    if selected_driver in DRIVER_DEFAULT_CAR:
+        target_car = DRIVER_DEFAULT_CAR[selected_driver]
+        if target_car in ui_car_list:
+            default_car_index = ui_car_list.index(target_car)
+
+    selected_car_ui = st.selectbox("🚗 차량 선택", ui_car_list, index=default_car_index)
+    actual_car_name = CAR_MAP[selected_car_ui]
 
     st.divider()
 
@@ -129,7 +149,8 @@ if check_login():
     
     col_start, col_end = st.columns(2)
     with col_start:
-        start_node = st.selectbox("📍 출발지", ["회사(전우정밀)", "통근노선 시작", "직접 입력"])
+        # [변경] 회사(전우정밀) 대신 '회사'로 깔끔하게 변경
+        start_node = st.selectbox("📍 출발지", ["회사", "통근노선 시작", "직접 입력"])
         if start_node == "직접 입력": 
             start_node = st.text_input("출발지 상세")
         start_km = st.number_input("📍 시작 거리 (km)", value=last_km, step=1)
@@ -159,7 +180,6 @@ if check_login():
 
     purpose = st.selectbox("📝 운행 내용", ["납품 및 업무협의", "통근버스 운행", "거래처 미팅", "현장 방문", "주유", "기타"])
     
-    # ✨ [신규 업그레이드] 비고 선택형 체크박스 연동
     show_memo = st.checkbox("📝 비고(특이사항) 작성하기")
     memo = ""
     if show_memo:
@@ -171,11 +191,14 @@ if check_login():
             st.error("종료 거리가 시작 거리보다 작을 수 없습니다!")
         else:
             try:
+                # 시트 저장 시 '회사'를 기존 데이터 연속성을 위해 '회사(전우정밀)'로 치환하여 저장
+                save_start_node = "회사(전우정밀)" if start_node == "회사" else start_node
+                
                 payload = {
                     "날짜": selected_date.strftime('%Y-%m-%d'),
                     "차량": actual_car_name,
                     "운전자": selected_driver,
-                    "출발지": start_node,
+                    "출발지": save_start_node,
                     "목적지": end_node,
                     "시작거리": int(start_km),
                     "종료거리": int(end_km),
@@ -200,7 +223,7 @@ if check_login():
             except Exception as e:
                 st.error(f"연결 오류가 발생했습니다: {e}")
 
-    # 5. 차량별 필터 및 데이터 테이블 뷰어 (열 순서 조정 완료)
+    # 5. 차량별 필터 및 데이터 테이블 뷰어 (요청 순서 전면 개편)
     with st.expander("📊 최근 운행 및 주유 기록 보기 (차량별 필터 지원)"):
         try:
             history_df = load_live_data()
@@ -209,7 +232,9 @@ if check_login():
                 filter_options = ["전체 보기"] + ui_car_list
                 selected_filter = st.selectbox("🔍 조회할 차량을 선택하세요", filter_options, key="view_filter")
                 
+                # 데이터 전처리: 풀네임을 짧은 UI 이름으로 변환하고 '회사(전우정밀)'을 '회사'로 일괄 치환
                 history_df['차량'] = history_df['차량'].map(REVERSE_CAR_MAP).fillna(history_df['차량'])
+                history_df['출발지'] = history_df['출발지'].replace({"회사(전우정밀)": "회사"})
                 
                 if selected_filter != "전체 보기":
                     display_df = history_df[history_df['차량'] == selected_filter]
@@ -217,12 +242,17 @@ if check_login():
                     display_df = history_df
                 
                 if not display_df.empty:
-                    # ✨ [순서 변경] 주행거리가 시작거리와 종료거리 바로 앞에 오도록 배열 배치 변경
-                    base_cols = ["날짜", "차량", "주행거리", "시작거리", "종료거리", "운전자", "출발지", "목적지", "운행내용", "비고", "연료종류", "주입량", "결제금액", "입력시간"]
+                    # ✨ [거리단위 추가 및 정렬 순서 전면 개편] 날짜 -> 운전자 -> 주행거리 -> 시작거리 -> 종료거리 -> 출발지 -> 목적지 순
+                    base_cols = ["날짜", "운전자", "주행거리", "시작거리", "종료거리", "출발지", "목적지", "운행내용", "비고", "연료종류", "주입량", "결제금액", "차량", "입력시간"]
                     target_cols = [c for c in base_cols if c in display_df.columns]
                     display_df = display_df[target_cols]
                     
-                    final_df = display_df.tail(5).iloc[::-1]
+                    final_df = display_df.tail(5).iloc[::-1].copy()
+                    
+                    # ✨ 거리에 관련된 숫자 뒤에 ' km' 붙여주기
+                    for dist_col in ["주행거리", "시작거리", "종료거리"]:
+                        if dist_col in final_df.columns:
+                            final_df[dist_col] = final_df[dist_col].apply(lambda x: f"{x} km" if x != "" and pd.notna(x) else "")
                     
                     styled_df = final_df.style.apply(highlight_reconstructed, axis=1)
                     st.dataframe(styled_df, use_container_width=True)
