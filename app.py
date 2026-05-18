@@ -8,13 +8,11 @@ st.set_page_config(page_title="전우정밀 차량관리", layout="centered")
 st.markdown("### 🚗 차량 운행 기록부 (새 시트)")
 
 # 2. 구글 시트 연결
-# 주소를 직접 지정하여 Secrets 설정 오류 가능성을 줄입니다.
 url = "https://docs.google.com/spreadsheets/d/1GdHg3aKD2OXEdUx6NhLK7kOQE-uWA5JGHzmqQE1SMRw/edit?gid=0#gid=0"
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 def get_dist(car_name):
     try:
-        # 새로 만든 시트 주소에서 데이터를 읽어옵니다.
         df = conn.read(spreadsheet=url, ttl=0)
         car_df = df[df['차량'] == car_name]
         if not car_df.empty:
@@ -39,14 +37,21 @@ st.divider()
 # 시작거리 자동 계산
 last_km = get_dist(car)
 
-# 들여쓰기 오류 방지를 위해 columns를 단순하게 사용합니다.
 c1, c2 = st.columns(2)
 with c1:
     s_node = st.text_input("📍 출발지", value="회사")
     s_km = st.number_input("시작거리(km)", value=int(last_km))
 
 with c2:
-    e_node = st.text_input("🎯 목적지")
+    # 🌟 목적지를 드롭박스(Selectbox)로 변경
+    # 자주 가시는 고객사나 목적지 목록을 아래 리스트에 넣어주세요.
+    node_list = ["VPHC", "AST", "AST2공장", "동아금속", "동진도금", "한국하이테크", "송원테크", "구산", "직접입력"]
+    e_node = st.selectbox("🎯 목적지 선택", node_list)
+    
+    # "직접입력"을 선택했을 때만 텍스트 입력창이 열리도록 처리
+    if e_node == "직접입력":
+        e_node = st.text_input("목적지 직접 입력", placeholder="예: 대구공장")
+        
     e_km = st.number_input("종료거리(km)", value=int(s_km))
 
 st.divider()
@@ -56,11 +61,13 @@ m = st.text_area("비고(특이사항)")
 
 # 4. 저장 로직
 if st.button("🚀 기록 저장", use_container_width=True, type="primary"):
-    if e_km < s_km:
+    # 목적지가 빈값인지 검증 (직접 입력창에서 아무것도 안 적었을 때 방지)
+    if not e_node or e_node.strip() == "":
+        st.error("목적지를 선택하거나 입력해 주세요!")
+    elif e_km < s_km:
         st.error("종료거리가 시작거리보다 작을 수 없습니다!")
     else:
         try:
-            # 새 데이터 프레임 생성
             new_row = pd.DataFrame([{
                 "날짜": d.strftime('%Y-%m-%d'),
                 "차량": car,
@@ -75,11 +82,9 @@ if st.button("🚀 기록 저장", use_container_width=True, type="primary"):
                 "입력시간": datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             }])
             
-            # 기존 데이터 읽기 및 병합
             df_old = conn.read(spreadsheet=url, ttl=0)
             df_final = pd.concat([df_old, new_row], ignore_index=True)
             
-            # 새 시트에 업데이트
             conn.update(spreadsheet=url, data=df_final)
             
             st.success("새 시트에 성공적으로 저장되었습니다!")
