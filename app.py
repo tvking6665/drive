@@ -29,14 +29,13 @@ USER_PW = {
     "이학장": "0000"
 }
 
-# 차량 이름 변환 딕셔너리 (UI 표시용 단축 이름 ↔ 구글 시트 저장용 풀 네임)
+# 차량 이름 변환 딕셔너리
 CAR_MAP = {
     "7.5톤": "7.5톤(파비스) 3528",
     "2.5톤": "2.5톤(마이티) 8569",
     "1톤": "1톤(포터) 5378",
     "통근차": "통근차(솔라티) 8740"
 }
-# 역방향 변환용 (시트에서 읽어온 데이터 매핑용)
 REVERSE_CAR_MAP = {v: k for k, v in CAR_MAP.items()}
 
 def check_login():
@@ -74,19 +73,17 @@ if check_login():
     with col2:
         st.markdown(f'<p class="main-title">차량 운행 및 주유 기록부 ({st.session_state.user_name}님)</p>', unsafe_allow_html=True)
 
-    # 데이터 실시간 로드 함수 (정수 변환 처리 강화)
+    # 데이터 실시간 로드 함수
     @st.cache_data(ttl=0)
     def load_live_data():
         try:
             df = pd.read_csv(f"{CSV_URL}&timestamp={datetime.now().timestamp()}")
             
-            # 숫자 열들을 소수점 없는 정수형으로 변환 (.0 제거)
             int_columns = ["시작거리", "종료거리", "주행거리", "주입량", "결제금액"]
             for col in int_columns:
                 if col in df.columns:
                     df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0).astype(int)
             
-            # 0으로 채워진 주입량과 결제금액 중 빈 칸이었던 부분은 다시 빈 문자열로 청소하여 가독성 확보
             df = df.replace({np.nan: ""})
             if "주입량" in df.columns:
                 df["주입량"] = df["주입량"].replace({0: ""})
@@ -107,10 +104,8 @@ if check_login():
         except:
             return 0
 
-    # ✨ [다크모드 패치] 주유 여부에 따라 행 전체를 형광색으로 채우고 글자색을 검은색으로 고정
     def highlight_reconstructed(row):
         if str(row['연료종류']).strip() != "":
-            # 배경색은 연노랑, 글자색은 검은색(black) 강제 지정, 글씨 두껍게
             return ['background-color: #fff9c4; color: black; font-weight: bold;'] * len(row)
         return [''] * len(row)
 
@@ -119,7 +114,6 @@ if check_login():
     ui_car_list = ["7.5톤", "2.5톤", "1톤", "통근차"]
     selected_car_ui = st.selectbox("🚗 차량 선택", ui_car_list)
     
-    # 실제 시트 저장용 풀네임 치환
     actual_car_name = CAR_MAP[selected_car_ui]
 
     selected_driver = st.session_state.user_name if st.session_state.user_name != "관리자" else "직접 입력"
@@ -150,23 +144,26 @@ if check_login():
 
     st.divider()
 
-    # 💡 [정수형 UI 변경] 주유 및 연료 기록 섹션 (min_value와 step을 정수형으로 고정)
+    # 주유 및 연료 기록 섹션
     st.markdown("### ⛽ 주유 기록 (선택 입력)")
     col_fuel1, col_fuel2, col_fuel3 = st.columns(3)
     
     with col_fuel1:
         fuel_type = st.selectbox("연료 종류", ["없음", "경유", "LPG", "요소수"])
     with col_fuel2:
-        # 주입량 단위를 정수형태(int)로 변경하여 입력 받음
         fuel_amount = st.number_input("주입량 (L)", min_value=0, value=0, step=1)
     with col_fuel3:
-        # 결제 금액 정수형태 입력
         fuel_price = st.number_input("결제 금액 (원)", min_value=0, value=0, step=1000)
 
     st.divider()
 
     purpose = st.selectbox("📝 운행 내용", ["납품 및 업무협의", "통근버스 운행", "거래처 미팅", "현장 방문", "주유", "기타"])
-    memo = st.text_area("비고 (특이사항)", height=100)
+    
+    # ✨ [신규 업그레이드] 비고 선택형 체크박스 연동
+    show_memo = st.checkbox("📝 비고(특이사항) 작성하기")
+    memo = ""
+    if show_memo:
+        memo = st.text_area("특이사항 내용을 입력하세요", height=100)
 
     # 4. 기록 저장 로직
     if st.button("🚀 기록 저장", use_container_width=True, type="primary"):
@@ -203,7 +200,7 @@ if check_login():
             except Exception as e:
                 st.error(f"연결 오류가 발생했습니다: {e}")
 
-    # 5. 차량별 필터 및 데이터 테이블 뷰어
+    # 5. 차량별 필터 및 데이터 테이블 뷰어 (열 순서 조정 완료)
     with st.expander("📊 최근 운행 및 주유 기록 보기 (차량별 필터 지원)"):
         try:
             history_df = load_live_data()
@@ -212,25 +209,21 @@ if check_login():
                 filter_options = ["전체 보기"] + ui_car_list
                 selected_filter = st.selectbox("🔍 조회할 차량을 선택하세요", filter_options, key="view_filter")
                 
-                # 시트에서 가져온 긴 이름을 UI용 단축 이름으로 변환
                 history_df['차량'] = history_df['차량'].map(REVERSE_CAR_MAP).fillna(history_df['차량'])
                 
-                # 필터링 처리
                 if selected_filter != "전체 보기":
                     display_df = history_df[history_df['차량'] == selected_filter]
                 else:
                     display_df = history_df
                 
                 if not display_df.empty:
-                    # 열 순서: 날짜, 차량 다음 바로 '주행거리' 배치
-                    base_cols = ["날짜", "차량", "주행거리", "운전자", "출발지", "목적지", "시작거리", "종료거리", "운행내용", "비고", "연료종류", "주입량", "결제금액", "입력시간"]
+                    # ✨ [순서 변경] 주행거리가 시작거리와 종료거리 바로 앞에 오도록 배열 배치 변경
+                    base_cols = ["날짜", "차량", "주행거리", "시작거리", "종료거리", "운전자", "출발지", "목적지", "운행내용", "비고", "연료종류", "주입량", "결제금액", "입력시간"]
                     target_cols = [c for c in base_cols if c in display_df.columns]
                     display_df = display_df[target_cols]
                     
-                    # 최신 등록 건 5개 슬라이싱
                     final_df = display_df.tail(5).iloc[::-1]
                     
-                    # 다크모드 하이라이트 스타일 빌딩 및 렌더링
                     styled_df = final_df.style.apply(highlight_reconstructed, axis=1)
                     st.dataframe(styled_df, use_container_width=True)
                 else:
