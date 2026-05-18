@@ -29,6 +29,16 @@ USER_PW = {
     "이학장": "0000"
 }
 
+# 차량 이름 변환 딕셔너리 (UI 표시용 단축 이름 ↔ 구글 시트 저장용 풀 네임)
+CAR_MAP = {
+    "7.5톤": "7.5톤(파비스) 3528",
+    "2.5톤": "2.5톤(마이티) 8569",
+    "1톤": "1톤(포터) 5378",
+    "통근차": "통근차(솔라티) 8740"
+}
+# 역방향 변환용 (시트에서 읽어온 데이터 매핑용)
+REVERSE_CAR_MAP = {v: k for k, v in CAR_MAP.items()}
+
 def check_login():
     if "login_success" not in st.session_state:
         st.session_state.login_success = False
@@ -64,16 +74,13 @@ if check_login():
     with col2:
         st.markdown(f'<p class="main-title">차량 운행 및 주유 기록부 ({st.session_state.user_name}님)</p>', unsafe_allow_html=True)
 
-    # 데이터 실시간 로드 함수 (캐시 방지 및 전처리 로직 강화)
+    # 데이터 실시간 로드 함수
     @st.cache_data(ttl=0)
     def load_live_data():
         try:
             df = pd.read_csv(f"{CSV_URL}&timestamp={datetime.now().timestamp()}")
-            
-            # None이나 NaN으로 깨져서 나오는 결측치를 화면 표시용 빈 문자열("")로 일괄 전처리
             df = df.replace({np.nan: ""})
             
-            # 숫자 데이터 형태가 소수점(.0)으로 변하는 현상 방지 처리
             for col in ["시작거리", "종료거리", "주행거리"]:
                 if col in df.columns:
                     df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0).astype(int)
@@ -81,20 +88,30 @@ if check_login():
         except Exception as e:
             return pd.DataFrame(columns=["날짜", "차량", "운전자", "출발지", "목적지", "시작거리", "종료거리", "주행거리", "운행내용", "비고", "입력시간", "연료종류", "주입량", "결제금액"])
 
-    def get_last_dist(car_name):
+    def get_last_dist(car_full_name):
         try:
             df = load_live_data()
-            car_df = df[df['차량'] == car_name]
+            car_df = df[df['차량'] == car_full_name]
             if not car_df.empty:
                 return int(car_df.iloc[-1]['종료거리'])
             return 0
         except:
             return 0
 
-    # 입력 UI 구성
+    # 주유 여부에 따라 행 전체를 형광색(노란색)으로 하이라이트하는 함수
+    def highlight_reconstructed(row):
+        # 연료종류 열에 값이 존재하는 경우 노란색 배경 적용
+        if str(row['연료종류']).strip() != "":
+            return ['background-color: #fff9c4'] * len(row)
+        return [''] * len(row)
+
+    # 입력 UI 구성 (간소화된 이름으로 드롭박스 구성)
     selected_date = st.date_input("📅 운행 및 주유 날짜", datetime.now())
-    car_list = ["7.5톤(파비스) 3528", "2.5톤(마이티) 8569", "1톤(포터) 5378", "통근차(솔라티) 8740"]
-    selected_car = st.selectbox("🚗 차량 선택", car_list)
+    ui_car_list = ["7.5톤", "2.5톤", "1톤", "통근차"]
+    selected_car_ui = st.selectbox("🚗 차량 선택", ui_car_list)
+    
+    # 실제 시트 저장용 풀네임 치환
+    actual_car_name = CAR_MAP[selected_car_ui]
 
     selected_driver = st.session_state.user_name if st.session_state.user_name != "관리자" else "직접 입력"
     if selected_driver == "직접 입력":
@@ -105,7 +122,7 @@ if check_login():
     st.divider()
 
     # 주행 거리 정보
-    last_km = get_last_dist(selected_car)
+    last_km = get_last_dist(actual_car_name)
     
     col_start, col_end = st.columns(2)
     with col_start:
@@ -148,7 +165,7 @@ if check_login():
             try:
                 payload = {
                     "날짜": selected_date.strftime('%Y-%m-%d'),
-                    "차량": selected_car,
+                    "차량": actual_car_name, # 기존 구조 유지를 위해 풀네임 저장
                     "운전자": selected_driver,
                     "출발지": start_node,
                     "목적지": end_node,
@@ -175,25 +192,37 @@ if check_login():
             except Exception as e:
                 st.error(f"연결 오류가 발생했습니다: {e}")
 
-    # 5. ✨ [기능 개선] 차량별 필터 기능이 통합된 데이터 테이블 뷰어
+    # 5. 차량별 필터 및 레이아웃 커스텀 데이터 테이블 뷰어
     with st.expander("📊 최근 운행 및 주유 기록 보기 (차량별 필터 지원)"):
         try:
             history_df = load_live_data()
             
             if not history_df.empty:
-                # 테이블 상단에 차량 필터용 셀렉트박스 배치
-                filter_options = ["전체 보기"] + car_list
+                filter_options = ["전체 보기"] + ui_car_list
                 selected_filter = st.selectbox("🔍 조회할 차량을 선택하세요", filter_options, key="view_filter")
                 
-                # 사용자가 선택한 차량에 맞게 데이터프레임 필터링
+                # 시트에서 가져온 긴 이름을 UI용 단축 이름으로 맵핑 변환
+                history_df['차량'] = history_df['차량'].map(REVERSE_CAR_MAP).fillna(history_df['차량'])
+                
+                # 필터링 처리
                 if selected_filter != "전체 보기":
                     display_df = history_df[history_df['차량'] == selected_filter]
                 else:
                     display_df = history_df
                 
-                # 최신순 정렬 후 상위 5개 데이터 바인딩
                 if not display_df.empty:
-                    st.dataframe(display_df.tail(5).iloc[::-1], use_container_width=True)
+                    # 열 순서 개편: 날짜, 차량 다음 바로 '주행거리'가 오도록 지정
+                    base_cols = ["날짜", "차량", "주행거리", "운전자", "출발지", "목적지", "시작거리", "종료거리", "운행내용", "비고", "연료종류", "주입량", "결제금액", "입력시간"]
+                    # 데이터프레임에 존재하는 컬럼만 안전하게 순서 정렬
+                    target_cols = [c for c in base_cols if c in display_df.columns]
+                    display_df = display_df[target_cols]
+                    
+                    # 최신 등록 건 5개 슬라이싱
+                    final_df = display_df.tail(5).iloc[::-1]
+                    
+                    # 주유 완료 건 형광색 하이라이트 스타일 빌딩 및 렌더링
+                    styled_df = final_df.style.apply(highlight_reconstructed, axis=1)
+                    st.dataframe(styled_df, use_container_width=True)
                 else:
                     st.info(f"'{selected_filter}'의 운행 기록이 존재하지 않습니다.")
             else:
