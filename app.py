@@ -3,8 +3,9 @@ import pandas as pd
 from datetime import datetime
 import requests
 import json
+import numpy as np
 
-# 0. 핵심 연동 주소 설정 (새로 주신 웹 앱 URL 반영 완료)
+# 0. 핵심 연동 주소 설정
 SHEET_ID = "1_4z6RBNn8HQ1_xfznsITZ0yGWu5xpP-BYDmOdi_ftaE"
 CSV_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&gid=0"
 WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzLMy1LMbCp-SpIC-ZGkGJS8ZeXkQ_xhzYwJPYD2YtSf9bZuwoNiDZ-KCFpuhv0AdAc/exec"
@@ -63,11 +64,20 @@ if check_login():
     with col2:
         st.markdown(f'<p class="main-title">차량 운행 및 주유 기록부 ({st.session_state.user_name}님)</p>', unsafe_allow_html=True)
 
-    # 데이터 실시간 로드 함수 (캐시 방지 및 새 항목 대응)
+    # 데이터 실시간 로드 함수 (캐시 방지 및 전처리 로직 강화)
     @st.cache_data(ttl=0)
     def load_live_data():
         try:
-            return pd.read_csv(f"{CSV_URL}&timestamp={datetime.now().timestamp()}")
+            df = pd.read_csv(f"{CSV_URL}&timestamp={datetime.now().timestamp()}")
+            
+            # None이나 NaN으로 깨져서 나오는 결측치를 화면 표시용 빈 문자열("")로 일괄 전처리
+            df = df.replace({np.nan: ""})
+            
+            # 숫자 데이터 형태가 소수점(.0)으로 변하는 현상 방지 처리
+            for col in ["시작거리", "종료거리", "주행거리"]:
+                if col in df.columns:
+                    df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0).astype(int)
+            return df
         except Exception as e:
             return pd.DataFrame(columns=["날짜", "차량", "운전자", "출발지", "목적지", "시작거리", "종료거리", "주행거리", "운행내용", "비고", "입력시간", "연료종류", "주입량", "결제금액"])
 
@@ -94,7 +104,7 @@ if check_login():
 
     st.divider()
 
-    # 주행 거리 정보 (이전 종료거리가 시작거리에 연동됨)
+    # 주행 거리 정보
     last_km = get_last_dist(selected_car)
     
     col_start, col_end = st.columns(2)
@@ -114,18 +124,15 @@ if check_login():
 
     st.divider()
 
-    # ⛽ 시작거리 아래에 위치한 주유 기록 섹션
+    # 주유 및 연료 기록 섹션
     st.markdown("### ⛽ 주유 기록 (선택 입력)")
     col_fuel1, col_fuel2, col_fuel3 = st.columns(3)
     
     with col_fuel1:
-        # 주유 항목 기본값 '없음' 처리
         fuel_type = st.selectbox("연료 종류", ["없음", "경유", "LPG", "요소수"])
     with col_fuel2:
-        # 소수점 입력 가능한 리터 입력 형태 (step=0.1)
         fuel_amount = st.number_input("주입량 (L)", min_value=0.0, value=0.0, step=0.1, format="%.1f")
     with col_fuel3:
-        # 정수형 금액 입력 형태 (원)
         fuel_price = st.number_input("결제 금액 (원)", min_value=0, value=0, step=1000)
 
     st.divider()
@@ -133,13 +140,12 @@ if check_login():
     purpose = st.selectbox("📝 운행 내용", ["납품 및 업무협의", "통근버스 운행", "거래처 미팅", "현장 방문", "주유", "기타"])
     memo = st.text_area("비고 (특이사항)", height=100)
 
-    # 4. 기록 저장 로직 (Google Apps Script API 전송)
+    # 4. 기록 저장 로직
     if st.button("🚀 기록 저장", use_container_width=True, type="primary"):
         if end_km < start_km:
             st.error("종료 거리가 시작 거리보다 작을 수 없습니다!")
         else:
             try:
-                # 구글 스프레드시트 열 제목에 1:1 매칭되는 JSON 데이터 폼 구성
                 payload = {
                     "날짜": selected_date.strftime('%Y-%m-%d'),
                     "차량": selected_car,
@@ -162,7 +168,6 @@ if check_login():
                 if response.status_code == 200:
                     st.success("구글 스프레드시트에 성공적으로 저장되었습니다!")
                     st.balloons()
-                    # 실시간 하단 뷰어 최신화를 위한 캐시 지우기 후 새로고침
                     st.cache_data.clear()
                     st.rerun()
                 else:
@@ -170,12 +175,27 @@ if check_login():
             except Exception as e:
                 st.error(f"연결 오류가 발생했습니다: {e}")
 
-    # 5. 최신 데이터 테이블 뷰어 (주유 데이터 확장 표기)
-    with st.expander("📊 최근 운행 및 주유 기록 보기 (최신순 5개)"):
+    # 5. ✨ [기능 개선] 차량별 필터 기능이 통합된 데이터 테이블 뷰어
+    with st.expander("📊 최근 운행 및 주유 기록 보기 (차량별 필터 지원)"):
         try:
             history_df = load_live_data()
+            
             if not history_df.empty:
-                st.dataframe(history_df.tail(5).iloc[::-1], use_container_width=True)
+                # 테이블 상단에 차량 필터용 셀렉트박스 배치
+                filter_options = ["전체 보기"] + car_list
+                selected_filter = st.selectbox("🔍 조회할 차량을 선택하세요", filter_options, key="view_filter")
+                
+                # 사용자가 선택한 차량에 맞게 데이터프레임 필터링
+                if selected_filter != "전체 보기":
+                    display_df = history_df[history_df['차량'] == selected_filter]
+                else:
+                    display_df = history_df
+                
+                # 최신순 정렬 후 상위 5개 데이터 바인딩
+                if not display_df.empty:
+                    st.dataframe(display_df.tail(5).iloc[::-1], use_container_width=True)
+                else:
+                    st.info(f"'{selected_filter}'의 운행 기록이 존재하지 않습니다.")
             else:
                 st.info("표시할 기록이 없습니다.")
         except Exception as e:
