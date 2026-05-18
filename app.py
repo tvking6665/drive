@@ -175,4 +175,67 @@ if check_login():
         else:
             try:
                 payload = {
-                    "날짜": selected_
+                    "날짜": selected_date.strftime('%Y-%m-%d'),
+                    "차량": actual_car_name,
+                    "운전자": selected_driver,
+                    "출발지": start_node,
+                    "목적지": end_node,
+                    "시작거리": int(start_km),
+                    "종료거리": int(end_km),
+                    "주행거리": int(total_distance),
+                    "운행내용": purpose,
+                    "비고": memo,
+                    "입력시간": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                    "연료종류": fuel_type if fuel_type != "없음" else "", 
+                    "주입량": int(fuel_amount) if fuel_amount > 0 else "",
+                    "결제금액": int(fuel_price) if fuel_price > 0 else ""
+                }
+                
+                response = requests.post(WEB_APP_URL, data=json.dumps(payload))
+                
+                if response.status_code == 200:
+                    st.success("구글 스프레드시트에 성공적으로 저장되었습니다!")
+                    st.balloons()
+                    st.cache_data.clear()
+                    st.rerun()
+                else:
+                    st.error(f"저장 실패 (서버 응답 코드: {response.status_code})")
+            except Exception as e:
+                st.error(f"연결 오류가 발생했습니다: {e}")
+
+    # 5. 차량별 필터 및 데이터 테이블 뷰어
+    with st.expander("📊 최근 운행 및 주유 기록 보기 (차량별 필터 지원)"):
+        try:
+            history_df = load_live_data()
+            
+            if not history_df.empty:
+                filter_options = ["전체 보기"] + ui_car_list
+                selected_filter = st.selectbox("🔍 조회할 차량을 선택하세요", filter_options, key="view_filter")
+                
+                # 시트에서 가져온 긴 이름을 UI용 단축 이름으로 변환
+                history_df['차량'] = history_df['차량'].map(REVERSE_CAR_MAP).fillna(history_df['차량'])
+                
+                # 필터링 처리
+                if selected_filter != "전체 보기":
+                    display_df = history_df[history_df['차량'] == selected_filter]
+                else:
+                    display_df = history_df
+                
+                if not display_df.empty:
+                    # 열 순서: 날짜, 차량 다음 바로 '주행거리' 배치
+                    base_cols = ["날짜", "차량", "주행거리", "운전자", "출발지", "목적지", "시작거리", "종료거리", "운행내용", "비고", "연료종류", "주입량", "결제금액", "입력시간"]
+                    target_cols = [c for c in base_cols if c in display_df.columns]
+                    display_df = display_df[target_cols]
+                    
+                    # 최신 등록 건 5개 슬라이싱
+                    final_df = display_df.tail(5).iloc[::-1]
+                    
+                    # 다크모드 하이라이트 스타일 빌딩 및 렌더링
+                    styled_df = final_df.style.apply(highlight_reconstructed, axis=1)
+                    st.dataframe(styled_df, use_container_width=True)
+                else:
+                    st.info(f"'{selected_filter}'의 운행 기록이 존재하지 않습니다.")
+            else:
+                st.info("표시할 기록이 없습니다.")
+        except Exception as e:
+            st.write("데이터를 불러오는 중입니다...")
