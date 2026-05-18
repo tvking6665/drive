@@ -3,6 +3,9 @@ import pandas as pd
 from datetime import datetime
 from streamlit_gsheets import GSheetsConnection
 
+# 구글 스프레드시트 주소 설정
+SPREADSHEET_URL = "https://docs.google.com/spreadsheets/d/1_4z6RBNn8HQ1_xfznsITZ0yGWu5xpP-BYDmOdi_ftaE/edit?hl=ko&gid=0#gid=0"
+
 # 1. 페이지 설정
 st.set_page_config(page_title="전우정밀 시스템", layout="centered")
 
@@ -56,8 +59,6 @@ if check_login():
         st.session_state.login_success = False
         st.rerun()
 
-    # --- 여기서부터 기존 차량 운행 기록부 코드 ---
-    
     col1, col2 = st.columns([1, 4])
     with col1:
         try:
@@ -68,12 +69,13 @@ if check_login():
     with col2:
         st.markdown(f'<p class="main-title">차량 운행 기록부 ({st.session_state.user_name}님)</p>', unsafe_allow_html=True)
 
-    # 구글 시트 연결
+    # 구글 시트 연결 (직접 URL 지정)
     conn = st.connection("gsheets", type=GSheetsConnection)
 
     def get_last_dist(car_name):
         try:
-            df = conn.read()
+            # 지정된 URL에서 데이터를 읽어옵니다.
+            df = conn.read(spreadsheet=SPREADSHEET_URL)
             car_df = df[df['차량'] == car_name]
             if not car_df.empty:
                 return int(car_df.iloc[-1]['종료거리'])
@@ -104,7 +106,6 @@ if check_login():
     with col_end:
         end_node = st.selectbox("🎯 목적지", ["왜관(VPHC)", "AST(2공장)", "동아금속", "통근노선 종점", "직접 입력"])
         if end_node == "직접 입력": end_node = st.text_input("목적지 상세")
-        # Placeholder 안내 문구 추가
         end_km = st.number_input("🏁 종료 거리 (km)", value=start_km, help="시작 거리보다 큰 값을 입력하세요")
 
     st.divider()
@@ -131,9 +132,12 @@ if check_login():
                     "비고": memo,
                     "입력시간": datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                 }])
-                existing_df = conn.read()
+                
+                # 기존 데이터 읽기 및 추가 후 업데이트 (URL 필수 지정)
+                existing_df = conn.read(spreadsheet=SPREADSHEET_URL)
                 updated_df = pd.concat([existing_df, new_data], ignore_index=True)
-                conn.update(data=updated_df)
+                
+                conn.update(spreadsheet=SPREADSHEET_URL, data=updated_df)
                 st.success("저장 완료!")
                 st.balloons()
             except Exception as e:
@@ -141,7 +145,7 @@ if check_login():
 
     with st.expander("📊 최근 기록 보기"):
         try:
-            history_df = conn.read()
+            history_df = conn.read(spreadsheet=SPREADSHEET_URL)
             st.dataframe(history_df.tail(5).iloc[::-1], use_container_width=True)
         except:
             st.write("데이터가 없습니다.")
