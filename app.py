@@ -130,7 +130,7 @@ if check_login():
         selected_driver_base = st.selectbox("👤 운전자 선택", ["김동현", "김태종", "이학장", "목록에 없음 (직접입력)"])
     
     # 키패드 상시 활성화를 위한 입력창
-    custom_driver_name = st.text_input("✍️ [목록에 없음 선택시] 운전자 성명을 직접 입력하세요", placeholder="예: 김xx")
+    custom_driver_name = st.text_input("✍️ [목록에 없음 선택시] 운전자 성명을 직접 입력하세요", placeholder="예: 박준석")
     
     if selected_driver_base == "목록에 없음 (직접입력)":
         selected_driver = custom_driver_name.strip()
@@ -190,4 +190,99 @@ if check_login():
 
         st.divider()
 
-        purpose = st.selectbox("📝 운행 내용",
+        purpose = st.selectbox("📝 운행 내용", ["납품 및 업무협의", "통근버스 운행", "거래처 미팅", "현장 방문", "주유", "기타"])
+        
+        show_memo = st.checkbox("📝 비고(특이사항) 작성하기")
+        memo = ""
+        if show_memo:
+            memo = st.text_area("특이사항 내용을 입력하세요", height=100)
+
+        st.divider()
+
+        # 저장 버튼 및 다중 클릭 제한 제어
+        submit_button = st.form_submit_button(
+            label="🚀 기록 저장" if not st.session_state.submit_disabled else "⏳ 데이터 전송 및 저장 중...",
+            use_container_width=True,
+            type="primary",
+            disabled=st.session_state.submit_disabled
+        )
+
+        if submit_button:
+            if not selected_driver:
+                st.error("운전자 성명이 입력되지 않았습니다. 직접 입력칸을 확인해주세요!")
+            elif end_km < start_km:
+                st.error("종료 거리가 시작 거리보다 작을 수 없습니다!")
+            else:
+                st.session_state.submit_disabled = True
+                
+                with st.spinner("구글 스프레드시트에 데이터를 안전하게 기록하고 있습니다. 잠시만 기다려주세요..."):
+                    try:
+                        save_start_node = "회사(전우정밀)" if start_node == "회사" else start_node
+                        
+                        payload = {
+                            "날짜": selected_date.strftime('%Y-%m-%d'),
+                            "차량": actual_car_name,
+                            "운전자": selected_driver,
+                            "출발지": save_start_node,
+                            "목적지": end_node,
+                            "시작거리": int(start_km),
+                            "종료거리": int(end_km),
+                            "주행거리": int(total_distance),
+                            "운행내용": purpose,
+                            "비고": memo,
+                            "입력시간": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                            "연료종류": fuel_type if fuel_type != "없음" else "", 
+                            "주입량": int(fuel_amount) if fuel_amount > 0 else "",
+                            "결제금액": int(fuel_price) if fuel_price > 0 else ""
+                        }
+                        
+                        response = requests.post(WEB_APP_URL, data=json.dumps(payload))
+                        
+                        if response.status_code == 200:
+                            st.toast("✅ 구글 스프레드시트에 성공적으로 저장되었습니다!")
+                            st.cache_data.clear()
+                            st.session_state.submit_disabled = False
+                            st.rerun()
+                        else:
+                            st.error(f"저장 실패 (서버 응답 코드: {response.status_code})")
+                            st.session_state.submit_disabled = False
+                    except Exception as e:
+                        st.error(f"연결 오류가 발생했습니다: {e}")
+                        st.session_state.submit_disabled = False
+
+    # 5. 차량별 필터 및 데이터 테이블 뷰어
+    with st.expander("📊 최근 운행 및 주유 기록 보기 (차량별 필터 지원)"):
+        try:
+            history_df = load_live_data(current_ts)
+            
+            if not history_df.empty:
+                filter_options = ["전체 보기"] + ui_car_list
+                selected_filter = st.selectbox("🔍 조회할 차량을 선택하세요", filter_options, key="view_filter")
+                
+                history_df['차량'] = history_df['차량'].map(REVERSE_CAR_MAP).fillna(history_df['차량'])
+                history_df['출발지'] = history_df['출발지'].replace({"회사(전우정밀)": "회사"})
+                
+                if selected_filter != "전체 보기":
+                    display_df = history_df[history_df['차량'] == selected_filter]
+                else:
+                    display_df = history_df
+                
+                if not display_df.empty:
+                    base_cols = ["날짜", "운전자", "주행거리", "시작거리", "종료거리", "출발지", "목적지", "운행내용", "비고", "연료종류", "주입량", "결제금액", "차량", "입력시간"]
+                    target_cols = [c for c in base_cols if c in display_df.columns]
+                    display_df = display_df[target_cols]
+                    
+                    final_df = display_df.tail(5).iloc[::-1].copy()
+                    
+                    for dist_col in ["주행거리", "시작거리", "종료거리"]:
+                        if dist_col in final_df.columns:
+                            final_df[dist_col] = final_df[dist_col].apply(lambda x: f"{x} km" if x != "" and pd.notna(x) else "")
+                    
+                    styled_df = final_df.style.apply(highlight_reconstructed, axis=1)
+                    st.dataframe(styled_df, use_container_width=True)
+                else:
+                    st.info(f"'{selected_filter}'의 운행 기록이 존재하지 않습니다.")
+            else:
+                st.info("표시할 기록이 없습니다.")
+        except Exception as e:
+            st.write("데이터를 불러오는 중입니다...")
