@@ -30,7 +30,7 @@ USER_PW = {
     "이학장": "0000"
 }
 
-# [개선] 모바일 가독성을 위해 화면 표시용 명칭(Value)에서 차량 번호 제거
+# 모바일 가독성을 위해 차량 번호 제거한 명칭
 CAR_MAP = {
     "7.5톤": "7.5톤(파비스)",
     "2.5톤": "2.5톤(마이티)",
@@ -38,7 +38,7 @@ CAR_MAP = {
     "통근차": "통근차(솔라티)"
 }
 
-# [중요] 구글 시트 저장 및 조회 연동을 위한 실제 풀네임 매핑 딕셔너리
+# 구글 시트 저장용 실제 풀네임
 CAR_FULL_NAME_MAP = {
     "7.5톤": "7.5톤(파비스) 3528",
     "2.5톤": "2.5톤(마이티) 8569",
@@ -87,7 +87,7 @@ if check_login():
     with col2:
         st.markdown(f'<p class="main-title">차량 운행 및 주유 기록부 ({st.session_state.user_name}님)</p>', unsafe_allow_html=True)
 
-    # 데이터 실시간 로드 함수 (시간초 캐시 버스팅 강화)
+    # 데이터 실시간 로드 함수
     @st.cache_data(ttl=0)
     def load_live_data(timestamp):
         try:
@@ -107,7 +107,6 @@ if check_login():
         except Exception as e:
             return pd.DataFrame(columns=["날짜", "차량", "운전자", "출발지", "목적지", "시작거리", "종료거리", "주행거리", "운행내용", "비고", "입력시간", "연료종류", "주입량", "결제금액"])
 
-    # 강제 리프레시용 타임스탬프 발행
     current_ts = datetime.now().timestamp()
     
     def get_last_dist(car_full_name):
@@ -129,61 +128,57 @@ if check_login():
         st.session_state.submit_disabled = False
 
     # -------------------------------------------------------------------------
-    # 실시간 반응용 UI (Form 외부 배치)
+    # [버그 해결 핵심] 실시간 유기적 반응이 필요한 모든 UI를 Form 외부로 전면 분리
     # -------------------------------------------------------------------------
     selected_date = st.date_input("📅 운행 및 주유 날짜", datetime.now())
     
-    # 운전자 선택 UI
+    # 1. 운전자 선택 및 입력
     selected_driver_base = st.session_state.user_name if st.session_state.user_name != "관리자" else "목록에서 선택"
     if selected_driver_base == "목록에서 선택":
         selected_driver_base = st.selectbox("👤 운전자 선택", ["김동현", "김태종", "이학장", "목록에 없음 (직접입력)"])
     
-    # 키패드 상시 활성화를 위한 입력창
     custom_driver_name = st.text_input("✍️ [목록에 없음 선택시] 운전자 성명을 직접 입력하세요", placeholder="예: 박준석")
-    
-    if selected_driver_base == "목록에 없음 (직접입력)":
-        selected_driver = custom_driver_name.strip()
-    else:
-        selected_driver = selected_driver_base
+    selected_driver = custom_driver_name.strip() if selected_driver_base == "목록에 없음 (직접입력)" else selected_driver_base
 
-    # 차량 선택 및 인덱스 처리
+    # 2. 차량 선택
     ui_car_list = ["7.5톤", "2.5톤", "1톤", "통근차"]
     default_car_index = 0
-    
     if selected_driver in DRIVER_DEFAULT_CAR:
         target_car = DRIVER_DEFAULT_CAR[selected_driver]
         if target_car in ui_car_list:
             default_car_index = ui_car_list.index(target_car)
 
     selected_car_ui = st.selectbox("🚗 차량 선택", ui_car_list, index=default_car_index)
-    
-    # 화면 표시용 명칭과 구글 시트 저장용 풀네임을 분리하여 정의
     display_car_name = CAR_MAP[selected_car_ui]
     actual_car_name = CAR_FULL_NAME_MAP[selected_car_ui]
 
-    # 구글 시트에서 차량 풀네임 기준으로 최종 종료거리 조회
+    # 실시간 최종 마일리지 계산
     last_km = get_last_dist(actual_car_name)
 
+    # 3. [개선] 출발지 및 목적지 선택 UI (모바일 키패드 충돌 해결을 위해 Form 외부 배치)
+    col_ui_start, col_ui_end = st.columns(2)
+    with col_ui_start:
+        start_node = st.selectbox("📍 출발지 선택", ["회사", "통근노선 시작", "직접 입력"])
+        custom_start_node = st.text_input("✍️ [출발지 직접 입력시] 상세 주소/장소 입력", placeholder="예: 경산공장")
+        final_start_node = custom_start_node.strip() if start_node == "직접 입력" else ("회사(전우정밀)" if start_node == "회사" else start_node)
+
+    with col_ui_end:
+        end_node = st.selectbox("🎯 목적지 선택", ["왜관(VPHC)", "AST(2공장)", "동아금속", "통근노선 종점", "직접 입력"])
+        custom_end_node = st.text_input("✍️ [목적지 직접 입력시] 상세 주소/장소 입력", placeholder="예: 대구지점")
+        final_end_node = custom_end_node.strip() if end_node == "직접 입력" else end_node
+
     # -------------------------------------------------------------------------
-    # 메인 입력 폼 섹션 (나머지 입력 및 저장 기능)
+    # 메인 입력 폼 섹션 (숫자 입력 및 데이터 최종 저장)
     # -------------------------------------------------------------------------
     with st.form(key="vehicle_form", clear_on_submit=False):
         
-        # [개선] 모바일에서 짤리지 않도록 차량 명칭 뒤의 번호를 지우고 깔끔하게 노출
-        st.markdown(f"**선택된 차량:** {display_car_name} (최종 거리: {last_km:,} km)")
+        st.markdown(f"**선택 차량:** {display_car_name} | **출발:** {final_start_node} ➔ **도착:** {final_end_node}")
         st.divider()
 
         col_start, col_end = st.columns(2)
         with col_start:
-            start_node = st.selectbox("📍 출발지", ["회사", "통근노선 시작", "직접 입력"])
-            if start_node == "직접 입력": 
-                start_node = st.text_input("출발지 상세")
             start_km = st.number_input("📍 시작 거리 (km)", value=last_km, step=1)
-
         with col_end:
-            end_node = st.selectbox("🎯 목적지", ["왜관(VPHC)", "AST(2공장)", "동아금속", "통근노선 종점", "직접 입력"])
-            if end_node == "직접 입력": 
-                end_node = st.text_input("목적지 상세")
             end_km = st.number_input("🏁 종료 거리 (km)", value=start_km, step=1, help="시작 거리보다 큰 값을 입력하세요")
 
         total_distance = end_km - start_km
@@ -192,7 +187,6 @@ if check_login():
 
         st.markdown("### ⛽ 주유 기록 (선택 입력)")
         col_fuel1, col_fuel2, col_fuel3 = st.columns(3)
-        
         with col_fuel1:
             fuel_type = st.selectbox("연료 종류", ["없음", "경유", "LPG", "요소수"])
         with col_fuel2:
@@ -221,22 +215,24 @@ if check_login():
 
         if submit_button:
             if not selected_driver:
-                st.error("운전자 성명이 입력되지 않았습니다. 직접 입력칸을 확인해주세요!")
+                st.error("운전자 성명이 입력되지 않았습니다!")
+            elif start_node == "직접 입력" and not custom_start_node:
+                st.error("출발지 내용을 직접 입력해주세요!")
+            elif end_node == "직접 입력" and not custom_end_node:
+                st.error("목적지 내용을 직접 입력해주세요!")
             elif end_km < start_km:
                 st.error("종료 거리가 시작 거리보다 작을 수 없습니다!")
             else:
                 st.session_state.submit_disabled = True
                 
-                with st.spinner("구글 스프레드시트에 데이터를 안전하게 기록하고 있습니다. 잠시만 기다려주세요..."):
+                with st.spinner("구글 스프레드시트에 데이터를 안전하게 기록하고 있습니다..."):
                     try:
-                        save_start_node = "회사(전우정밀)" if start_node == "회사" else start_node
-                        
                         payload = {
                             "날짜": selected_date.strftime('%Y-%m-%d'),
-                            "차량": actual_car_name,  # 구글 시트에는 기존 일관성을 위해 '1톤(포터) 5378' 풀네임 저장
+                            "차량": actual_car_name,
                             "운전자": selected_driver,
-                            "출발지": save_start_node,
-                            "목적지": end_node,
+                            "출발지": final_start_node,
+                            "목적지": final_end_node,
                             "시작거리": int(start_km),
                             "종료거리": int(end_km),
                             "주행거리": int(total_distance),
@@ -263,7 +259,7 @@ if check_login():
                         st.session_state.submit_disabled = False
 
     # 5. 차량별 필터 및 데이터 테이블 뷰어
-    with st.expander("📊 최근 운행 및 주유 기록 보기 (차량별 필터 지원)"):
+    with st.expander("📊 최근 운행 및 주유 기록 보기"):
         try:
             history_df = load_live_data(current_ts)
             
@@ -271,14 +267,11 @@ if check_login():
                 filter_options = ["전체 보기"] + ui_car_list
                 selected_filter = st.selectbox("🔍 조회할 차량을 선택하세요", filter_options, key="view_filter")
                 
-                # 데이터 전처리: 풀네임을 짧은 UI 이름(번호 제외)으로 변환
                 history_df['차량'] = history_df['차량'].map(REVERSE_CAR_MAP).fillna(history_df['차량'])
-                # 아래 조회용 테이블에서도 번호 없는 명칭으로 일관성 있게 치환 표현
                 history_df['차량'] = history_df['차량'].map(CAR_MAP).fillna(history_df['차량'])
                 history_df['출발지'] = history_df['출발지'].replace({"회사(전우정밀)": "회사"})
                 
                 if selected_filter != "전체 보기":
-                    # 필터링은 단축명칭('1톤' 등) 기준으로 수행
                     display_df = history_df[history_df['차량'].str.contains(CAR_MAP[selected_filter], na=False)]
                 else:
                     display_df = history_df
