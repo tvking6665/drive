@@ -30,7 +30,6 @@ USER_PW = {
     "이학장": "0000"
 }
 
-# 모바일 가독성을 위해 차량 번호 제거한 명칭
 CAR_MAP = {
     "7.5톤": "7.5톤(파비스)",
     "2.5톤": "2.5톤(마이티)",
@@ -38,7 +37,6 @@ CAR_MAP = {
     "통근차": "통근차(솔라티)"
 }
 
-# 구글 시트 저장용 실제 풀네임
 CAR_FULL_NAME_MAP = {
     "7.5톤": "7.5톤(파비스) 3528",
     "2.5톤": "2.5톤(마이티) 8569",
@@ -127,18 +125,23 @@ if check_login():
     if "submit_disabled" not in st.session_state:
         st.session_state.submit_disabled = False
 
+    # ✨ [핵심] 성공 시 입력 폼을 강제로 백지화시키기 위한 고유 버전 카운터 초기화
+    if "form_version" not in st.session_state:
+        st.session_state.form_version = 0
+        
+    v = st.session_state.form_version
+
     # -------------------------------------------------------------------------
-    # [UI 대수술] 드롭박스에서 '직접입력' 항목 자르고 상시 텍스트 연동 체제로 전환
+    # [실시간 반응 UI] 각 위젯의 key 뒤에 _v 를 붙여 저장 후 자동 초기화 유도
     # -------------------------------------------------------------------------
-    selected_date = st.date_input("📅 운행 및 주유 날짜", datetime.now())
+    selected_date = st.date_input("📅 운행 및 주유 날짜", datetime.now(), key=f"date_{v}")
     
     # 1. 운전자 선택 및 입력
     selected_driver_base = st.session_state.user_name if st.session_state.user_name != "관리자" else "목록에서 선택"
     if selected_driver_base == "목록에서 선택":
-        selected_driver_base = st.selectbox("👤 운전자 선택", ["김동현", "김태종", "이학장"])
+        selected_driver_base = st.selectbox("👤 운전자 선택", ["김동현", "김태종", "이학장"], key=f"driver_sel_{v}")
     
-    # 직접 입력창에 글자가 들어가면 무조건 직접 입력된 값으로 확정 처리
-    custom_driver_name = st.text_input("✍️ [목록에 이름이 없는 분만] 운전자 성명 직접 입력", placeholder="예: 박준석")
+    custom_driver_name = st.text_input("✍️ [목록에 이름이 없는 분만] 운전자 성명 직접 입력", placeholder="예: 박준석", key=f"driver_txt_{v}")
     selected_driver = custom_driver_name.strip() if custom_driver_name.strip() != "" else selected_driver_base
 
     # 2. 차량 선택
@@ -149,49 +152,47 @@ if check_login():
         if target_car in ui_car_list:
             default_car_index = ui_car_list.index(target_car)
 
-    selected_car_ui = st.selectbox("🚗 차량 선택", ui_car_list, index=default_car_index)
+    selected_car_ui = st.selectbox("🚗 차량 선택", ui_car_list, index=default_car_index, key=f"car_sel_{v}")
     display_car_name = CAR_MAP[selected_car_ui]
     actual_car_name = CAR_FULL_NAME_MAP[selected_car_ui]
 
-    # 실시간 최종 마일리지 계산
     last_km = get_last_dist(actual_car_name)
 
-    # 3. 출발지 및 목적지 선택 UI (드롭박스에서 '직접 입력' 옵션 제거)
+    # 3. 출발지 및 목적지 선택 UI
     col_ui_start, col_ui_end = st.columns(2)
     with col_ui_start:
-        start_node = st.selectbox("📍 출발지 선택", ["회사", "통근노선 시작"])
-        custom_start_node = st.text_input("✍️ [기타 장소 출발시] 출발지 직접 입력", placeholder="예: 외주공장명, 주소 등")
-        # 직접 입력 칸에 값이 채워져 있으면 우선 반영
+        start_node = st.selectbox("📍 출발지 선택", ["회사", "통근노선 시작"], key=f"start_sel_{v}")
+        custom_start_node = st.text_input("✍️ [기타 장소 출발시] 출발지 직접 입력", placeholder="예: 외주공장명, 주소 등", key=f"start_txt_{v}")
         final_start_node = custom_start_node.strip() if custom_start_node.strip() != "" else ("회사(전우정밀)" if start_node == "회사" else start_node)
 
     with col_ui_end:
-        end_node = st.selectbox("🎯 목적지 선택", ["왜관(VPHC)", "AST(2공장)", "동아금속", "통근노선 종점"])
-        custom_end_node = st.text_input("✍️ [기타 장소 도착시] 목적지 직접 입력", placeholder="예: 거래처명, 주소 등")
-        # 직접 입력 칸에 값이 채워져 있으면 우선 반영
+        end_node = st.selectbox("🎯 목적지 선택", ["왜관(VPHC)", "AST(2공장)", "동아금속", "통근노선 종점"], key=f"end_sel_{v}")
+        custom_end_node = st.text_input("✍️ [기타 장소 도착시] 목적지 직접 입력", placeholder="예: 거래처명, 주소 등", key=f"end_txt_{v}")
         final_end_node = custom_end_node.strip() if custom_end_node.strip() != "" else end_node
 
     # 4. 운행 내용 선택
-    purpose = st.selectbox("📝 운행 내용", ["납품 및 업무협의", "통근버스 운행", "거래처 미팅", "현장 방문", "주유", "기타"])
+    purpose = st.selectbox("📝 운행 내용", ["납품 및 업무협의", "통근버스 운행", "거래처 미팅", "현장 방문", "주유", "기타"], key=f"purpose_{v}")
 
     # 5. 비고(특이사항) 체크박스 및 입력창
-    show_memo = st.checkbox("📝 비고(특이사항) 작성하기")
+    show_memo = st.checkbox("📝 비고(특이사항) 작성하기", key=f"memo_chk_{v}")
     memo = ""
     if show_memo:
-        memo = st.text_area("특이사항 내용을 입력하세요", placeholder="예: 주유 정산 필요, 차량 소음 발생 등", height=100)
+        memo = st.text_area("특이사항 내용을 입력하세요", placeholder="예: 주유 정산 필요, 차량 소음 발생 등", height=100, key=f"memo_txt_{v}")
 
     # -------------------------------------------------------------------------
     # 메인 입력 폼 섹션 (숫자 입력 및 데이터 최종 저장)
     # -------------------------------------------------------------------------
-    with st.form(key="vehicle_form", clear_on_submit=False):
+    with st.form(key=f"vehicle_form_{v}", clear_on_submit=False):
         
         st.markdown(f"**선택 차량:** {display_car_name} | **출발:** {final_start_node} ➔ **도착:** {final_end_node}")
         st.divider()
 
         col_start, col_end = st.columns(2)
         with col_start:
-            start_km = st.number_input("📍 시작 거리 (km)", value=last_km, step=1)
+            # key 기반으로 저장 후 last_km로 깔끔하게 초기화되도록 세팅
+            start_km = st.number_input("📍 시작 거리 (km)", value=last_km, step=1, key=f"start_km_{v}")
         with col_end:
-            end_km = st.number_input("🏁 종료 거리 (km)", value=start_km, step=1, help="시작 거리보다 큰 값을 입력하세요")
+            end_km = st.number_input("🏁 종료 거리 (km)", value=start_km, step=1, help="시작 거리보다 큰 값을 입력하세요", key=f"end_km_{v}")
 
         total_distance = end_km - start_km
 
@@ -200,11 +201,11 @@ if check_login():
         st.markdown("### ⛽ 주유 기록 (선택 입력)")
         col_fuel1, col_fuel2, col_fuel3 = st.columns(3)
         with col_fuel1:
-            fuel_type = st.selectbox("연료 종류", ["없음", "경유", "LPG", "요소수"])
+            fuel_type = st.selectbox("연료 종류", ["없음", "경유", "LPG", "요소수"], key=f"fuel_type_{v}")
         with col_fuel2:
-            fuel_amount = st.number_input("주입량 (L)", min_value=0, value=0, step=1)
+            fuel_amount = st.number_input("주입량 (L)", min_value=0, value=0, step=1, key=f"fuel_amt_{v}")
         with col_fuel3:
-            fuel_price = st.number_input("결제 금액 (원)", min_value=0, value=0, step=1000)
+            fuel_price = st.number_input("결제 금액 (원)", min_value=0, value=0, step=1000, key=f"fuel_price_{v}")
 
         st.divider()
 
@@ -221,6 +222,9 @@ if check_login():
                 st.error("운전자 성명이 입력되지 않았습니다!")
             elif end_km < start_km:
                 st.error("종료 거리가 시작 거리보다 작을 수 없습니다!")
+            elif total_distance == 0:
+                # ✨ [실수 연타 완전 차단] 주행거리가 0km이면 입력을 전면 거부합니다.
+                st.error("주행 거리가 0 km입니다! 종료 거리를 전일 거리보다 크게 수정 후 저장해 주세요.")
             else:
                 st.session_state.submit_disabled = True
                 
@@ -248,6 +252,9 @@ if check_login():
                         if response.status_code == 200:
                             st.toast("✅ 구글 스프레드시트에 성공적으로 저장되었습니다!")
                             st.cache_data.clear()
+                            
+                            # ✨ [핵심 리셋] 버전을 1 올려서 모든 직접 입력칸 및 위젯을 백지 상태로 강제 초기화
+                            st.session_state.form_version += 1
                             st.session_state.submit_disabled = False
                             st.rerun()
                         else:
