@@ -185,13 +185,13 @@ if check_login():
         memo = st.text_area("특이사항 내용을 입력하세요", height=100)
 
     # -------------------------------------------------------------------------
-    # 4. 기록 저장 로직 (★ 중복 클릭 및 연타 방지 기능 전면 반영)
+    # 4. 기록 저장 로직 (★ 로딩 메시지 무한 노출 버그 완벽 해결)
     # -------------------------------------------------------------------------
     if "is_saving" not in st.session_state:
         st.session_state.is_saving = False
 
-    def trigger_save():
-        st.session_state.is_saving = True
+    # 알림 문구를 띄울 빈 공간을 미리 확보하여 버그를 방지합니다.
+    status_container = st.empty()
 
     # 저장 중일 때는 버튼이 흐려지며(disabled=True) 클릭이 차단됩니다.
     if st.button(
@@ -199,51 +199,52 @@ if check_login():
         use_container_width=True, 
         type="primary",
         disabled=st.session_state.is_saving,
-        on_click=trigger_save
+        key="btn_save_record"
     ):
         if end_km < start_km:
             st.error("종료 거리가 시작 거리보다 작을 수 없습니다!")
-            st.session_state.is_saving = False  # 유효성 검사 실패 시 버튼 재활성화
         else:
-            # 전송 중일 때 화면에 로딩 스피너 및 대기 문구 출력
-            with st.spinner("구글 스프레드시트에 데이터를 안전하게 기록하고 있습니다. 잠시만 기다려주세요..."):
-                try:
-                    # 시트 저장 시 '회사'를 기존 데이터 연속성을 위해 '회사(전우정밀)'로 치환하여 저장
-                    save_start_node = "회사(전우정밀)" if start_node == "회사" else start_node
-                    
-                    payload = {
-                        "날짜": selected_date.strftime('%Y-%m-%d'),
-                        "차량": actual_car_name,
-                        "운전자": selected_driver,
-                        "출발지": save_start_node,
-                        "목적지": end_node,
-                        "시작거리": int(start_km),
-                        "종료거리": int(end_km),
-                        "주행거리": int(total_distance),
-                        "운행내용": purpose,
-                        "비고": memo,
-                        "입력시간": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                        "연료종류": fuel_type if fuel_type != "없음" else "", 
-                        "주입량": int(fuel_amount) if fuel_amount > 0 else "",
-                        "결제금액": int(fuel_price) if fuel_price > 0 else ""
-                    }
-                    
-                    response = requests.post(WEB_APP_URL, data=json.dumps(payload))
-                    
-                    if response.status_code == 200:
-                        st.success("구글 스프레드시트에 성공적으로 저장되었습니다!")
-                        st.balloons()
-                        st.cache_data.clear()
+            # 클릭 즉시 버튼 비활성화 상태로 전환 및 화면 락
+            st.session_state.is_saving = True
+            
+            # 독립된 상자 안에서만 로딩 메시지가 돌도록 격리
+            with status_container.container():
+                with st.spinner("구글 스프레드시트에 데이터를 안전하게 기록하고 있습니다. 잠시만 기다려주세요..."):
+                    try:
+                        save_start_node = "회사(전우정밀)" if start_node == "회사" else start_node
                         
-                        # 전송 완료 후 상태값 리셋 및 새로고침
+                        payload = {
+                            "날짜": selected_date.strftime('%Y-%m-%d'),
+                            "차량": actual_car_name,
+                            "운전자": selected_driver,
+                            "출발지": save_start_node,
+                            "목적지": end_node,
+                            "시작거리": int(start_km),
+                            "종료거리": int(end_km),
+                            "주행거리": int(total_distance),
+                            "운행내용": purpose,
+                            "비고": memo,
+                            "입력시간": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                            "연료종류": fuel_type if fuel_type != "없음" else "", 
+                            "주입량": int(fuel_amount) if fuel_amount > 0 else "",
+                            "결제금액": int(fuel_price) if fuel_price > 0 else ""
+                        }
+                        
+                        response = requests.post(WEB_APP_URL, data=json.dumps(payload))
+                        
+                        if response.status_code == 200:
+                            # 성공 시 임시 안내를 띄우고 세션 리셋 후 즉시 리런하여 잔상을 소멸시킵니다.
+                            st.toast("✅ 구글 스프레드시트에 성공적으로 저장되었습니다!")
+                            st.cache_data.clear()
+                            st.session_state.is_saving = False
+                            status_container.empty() # 로딩 창 강제 삭제
+                            st.rerun()
+                        else:
+                            st.error(f"저장 실패 (서버 응답 코드: {response.status_code})")
+                            st.session_state.is_saving = False
+                    except Exception as e:
+                        st.error(f"연결 오류가 발생했습니다: {e}")
                         st.session_state.is_saving = False
-                        st.rerun()
-                    else:
-                        st.error(f"저장 실패 (서버 응답 코드: {response.status_code})")
-                        st.session_state.is_saving = False  # 실패 시 버튼 재활성화
-                except Exception as e:
-                    st.error(f"연결 오류가 발생했습니다: {e}")
-                    st.session_state.is_saving = False  # 오류 발생 시 버튼 재활성화
 
     # 5. 차량별 필터 및 데이터 테이블 뷰어
     with st.expander("📊 최근 운행 및 주유 기록 보기 (차량별 필터 지원)"):
