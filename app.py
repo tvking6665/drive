@@ -17,6 +17,8 @@ st.markdown("""
     <style>
     .main-title { font-size: 24px !important; font-weight: bold; margin-bottom: 10px; display: flex; align-items: center; }
     div[data-testid="stExpander"] div[role="button"] p { font-weight: bold; color: #2e7d32; }
+    /* 폼 테두리 투명화 처리로 기존 UI 디자인 유지 */
+    div[data-testid="stForm"] { border: none !important; padding: 0 !important; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -116,99 +118,95 @@ if check_login():
             return ['background-color: #fff9c4; color: black; font-weight: bold;'] * len(row)
         return [''] * len(row)
 
-    # UI 구성을 위한 세션 상태 초기화 (운전자 변경 감지용)
-    if "prev_driver" not in st.session_state:
-        st.session_state.prev_driver = ""
+    # 중복 클릭 차단 및 전송 프로세스용 세션 상태 정의
+    if "submit_disabled" not in st.session_state:
+        st.session_state.submit_disabled = False
 
-    # 입력 UI 구성
-    selected_date = st.date_input("📅 운행 및 주유 날짜", datetime.now())
-    
-    # 운전자 선택을 차량 선택보다 위로 배치하여 연동이 자연스럽게 보이도록 수정
-    selected_driver = st.session_state.user_name if st.session_state.user_name != "관리자" else "직접 입력"
-    if selected_driver == "직접 입력":
-        selected_driver = st.selectbox("👤 운전자 선택", ["김동현", "김태종", "이학장", "직접 입력"])
+    # 입력 UI 구성을 전체적으로 하나의 Form으로 감싸서 다중 이벤트를 차단합니다.
+    with st.form(key="vehicle_form", clear_on_submit=False):
+        
+        # 입력 UI 구성
+        selected_date = st.date_input("📅 운행 및 주유 날짜", datetime.now())
+        
+        selected_driver = st.session_state.user_name if st.session_state.user_name != "관리자" else "직접 입력"
         if selected_driver == "직접 입력":
-            selected_driver = st.text_input("운전자 성명 입력")
+            selected_driver = st.selectbox("👤 운전자 선택", ["김동현", "김태종", "이학장", "직접 입력"])
+            if selected_driver == "직접 입력":
+                selected_driver = st.text_input("운전자 성명 입력")
 
-    # 운전자가 바뀐 경우 매핑된 기본 차량의 index 번호를 찾음
-    ui_car_list = ["7.5톤", "2.5톤", "1톤", "통근차"]
-    default_car_index = 0
-    
-    if selected_driver in DRIVER_DEFAULT_CAR:
-        target_car = DRIVER_DEFAULT_CAR[selected_driver]
-        if target_car in ui_car_list:
-            default_car_index = ui_car_list.index(target_car)
+        ui_car_list = ["7.5톤", "2.5톤", "1톤", "통근차"]
+        default_car_index = 0
+        
+        if selected_driver in DRIVER_DEFAULT_CAR:
+            target_car = DRIVER_DEFAULT_CAR[selected_driver]
+            if target_car in ui_car_list:
+                default_car_index = ui_car_list.index(target_car)
 
-    selected_car_ui = st.selectbox("🚗 차량 선택", ui_car_list, index=default_car_index)
-    actual_car_name = CAR_MAP[selected_car_ui]
+        selected_car_ui = st.selectbox("🚗 차량 선택", ui_car_list, index=default_car_index)
+        actual_car_name = CAR_MAP[selected_car_ui]
 
-    st.divider()
+        st.divider()
 
-    # 주행 거리 정보
-    last_km = get_last_dist(actual_car_name)
-    
-    col_start, col_end = st.columns(2)
-    with col_start:
-        start_node = st.selectbox("📍 출발지", ["회사", "통근노선 시작", "직접 입력"])
-        if start_node == "직접 입력": 
-            start_node = st.text_input("출발지 상세")
-        start_km = st.number_input("📍 시작 거리 (km)", value=last_km, step=1)
+        # 주행 거리 정보
+        last_km = get_last_dist(actual_car_name)
+        
+        col_start, col_end = st.columns(2)
+        with col_start:
+            start_node = st.selectbox("📍 출발지", ["회사", "통근노선 시작", "직접 입력"])
+            if start_node == "직접 입력": 
+                start_node = st.text_input("출발지 상세")
+            start_km = st.number_input("📍 시작 거리 (km)", value=last_km, step=1)
 
-    with col_end:
-        end_node = st.selectbox("🎯 목적지", ["왜관(VPHC)", "AST(2공장)", "동아금속", "통근노선 종점", "직접 입력"])
-        if end_node == "직접 입력": 
-            end_node = st.text_input("목적지 상세")
-        end_km = st.number_input("🏁 종료 거리 (km)", value=start_km, step=1, help="시작 거리보다 큰 값을 입력하세요")
+        with col_end:
+            end_node = st.selectbox("🎯 목적지", ["왜관(VPHC)", "AST(2공장)", "동아금속", "통근노선 종점", "직접 입력"])
+            if end_node == "직접 입력": 
+                end_node = st.text_input("목적지 상세")
+            end_km = st.number_input("🏁 종료 거리 (km)", value=start_km, step=1, help="시작 거리보다 큰 값을 입력하세요")
 
-    total_distance = end_km - start_km
+        total_distance = end_km - start_km
 
-    st.divider()
+        st.divider()
 
-    # 주유 및 연료 기록 섹션
-    st.markdown("### ⛽ 주유 기록 (선택 입력)")
-    col_fuel1, col_fuel2, col_fuel3 = st.columns(3)
-    
-    with col_fuel1:
-        fuel_type = st.selectbox("연료 종류", ["없음", "경유", "LPG", "요소수"])
-    with col_fuel2:
-        fuel_amount = st.number_input("주입량 (L)", min_value=0, value=0, step=1)
-    with col_fuel3:
-        fuel_price = st.number_input("결제 금액 (원)", min_value=0, value=0, step=1000)
+        # 주유 및 연료 기록 섹션
+        st.markdown("### ⛽ 주유 기록 (선택 입력)")
+        col_fuel1, col_fuel2, col_fuel3 = st.columns(3)
+        
+        with col_fuel1:
+            fuel_type = st.selectbox("연료 종류", ["없음", "경유", "LPG", "요소수"])
+        with col_fuel2:
+            fuel_amount = st.number_input("주입량 (L)", min_value=0, value=0, step=1)
+        with col_fuel3:
+            fuel_price = st.number_input("결제 금액 (원)", min_value=0, value=0, step=1000)
 
-    st.divider()
+        st.divider()
 
-    purpose = st.selectbox("📝 운행 내용", ["납품 및 업무협의", "통근버스 운행", "거래처 미팅", "현장 방문", "주유", "기타"])
-    
-    show_memo = st.checkbox("📝 비고(특이사항) 작성하기")
-    memo = ""
-    if show_memo:
-        memo = st.text_area("특이사항 내용을 입력하세요", height=100)
+        purpose = st.selectbox("📝 운행 내용", ["납품 및 업무협의", "통근버스 운행", "거래처 미팅", "현장 방문", "주유", "기타"])
+        
+        show_memo = st.checkbox("📝 비고(특이사항) 작성하기")
+        memo = ""
+        if show_memo:
+            memo = st.text_area("특이사항 내용을 입력하세요", height=100)
 
-    # -------------------------------------------------------------------------
-    # 4. 기록 저장 로직 (★ 로딩 메시지 무한 노출 버그 완벽 해결)
-    # -------------------------------------------------------------------------
-    if "is_saving" not in st.session_state:
-        st.session_state.is_saving = False
+        st.divider()
 
-    # 알림 문구를 띄울 빈 공간을 미리 확보하여 버그를 방지합니다.
-    status_container = st.empty()
+        # -------------------------------------------------------------------------
+        # 4. 기록 저장 로직 (★ 연타 및 무한 로딩 잔상 완벽 해결 버젼)
+        # -------------------------------------------------------------------------
+        # 버튼 자체의 비활성화 조건과 내부 로직 검증을 유기적으로 연동합니다.
+        submit_button = st.form_submit_button(
+            label="🚀 기록 저장" if not st.session_state.submit_disabled else "⏳ 데이터 전송 및 저장 중...",
+            use_container_width=True,
+            type="primary",
+            disabled=st.session_state.submit_disabled
+        )
 
-    # 저장 중일 때는 버튼이 흐려지며(disabled=True) 클릭이 차단됩니다.
-    if st.button(
-        "🚀 기록 저장" if not st.session_state.is_saving else "⏳ 데이터 전송 및 저장 중...", 
-        use_container_width=True, 
-        type="primary",
-        disabled=st.session_state.is_saving,
-        key="btn_save_record"
-    ):
-        if end_km < start_km:
-            st.error("종료 거리가 시작 거리보다 작을 수 없습니다!")
-        else:
-            # 클릭 즉시 버튼 비활성화 상태로 전환 및 화면 락
-            st.session_state.is_saving = True
-            
-            # 독립된 상자 안에서만 로딩 메시지가 돌도록 격리
-            with status_container.container():
+        if submit_button:
+            if end_km < start_km:
+                st.error("종료 거리가 시작 거리보다 작을 수 없습니다!")
+            else:
+                # [핵심] 진입 즉시 세션 변수를 가동하여 추가 클릭 및 백그라운드 재트리거 원천 차단
+                st.session_state.submit_disabled = True
+                
                 with st.spinner("구글 스프레드시트에 데이터를 안전하게 기록하고 있습니다. 잠시만 기다려주세요..."):
                     try:
                         save_start_node = "회사(전우정밀)" if start_node == "회사" else start_node
@@ -233,18 +231,18 @@ if check_login():
                         response = requests.post(WEB_APP_URL, data=json.dumps(payload))
                         
                         if response.status_code == 200:
-                            # 성공 시 임시 안내를 띄우고 세션 리셋 후 즉시 리런하여 잔상을 소멸시킵니다.
                             st.toast("✅ 구글 스프레드시트에 성공적으로 저장되었습니다!")
                             st.cache_data.clear()
-                            st.session_state.is_saving = False
-                            status_container.empty() # 로딩 창 강제 삭제
+                            
+                            # 저장이 끝난 후 변수를 해제하고 리런하여 클린한 상태로 화면 갱신
+                            st.session_state.submit_disabled = False
                             st.rerun()
                         else:
                             st.error(f"저장 실패 (서버 응답 코드: {response.status_code})")
-                            st.session_state.is_saving = False
+                            st.session_state.submit_disabled = False
                     except Exception as e:
                         st.error(f"연결 오류가 발생했습니다: {e}")
-                        st.session_state.is_saving = False
+                        st.session_state.submit_disabled = False
 
     # 5. 차량별 필터 및 데이터 테이블 뷰어
     with st.expander("📊 최근 운행 및 주유 기록 보기 (차량별 필터 지원)"):
