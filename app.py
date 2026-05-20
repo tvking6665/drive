@@ -125,14 +125,13 @@ if check_login():
     if "submit_disabled" not in st.session_state:
         st.session_state.submit_disabled = False
 
-    # ✨ [핵심] 성공 시 입력 폼을 강제로 백지화시키기 위한 고유 버전 카운터 초기화
     if "form_version" not in st.session_state:
         st.session_state.form_version = 0
         
     v = st.session_state.form_version
 
     # -------------------------------------------------------------------------
-    # [실시간 반응 UI] 각 위젯의 key 뒤에 _v 를 붙여 저장 후 자동 초기화 유도
+    # [실시간 반응 UI] 
     # -------------------------------------------------------------------------
     selected_date = st.date_input("📅 운행 및 주유 날짜", datetime.now(), key=f"date_{v}")
     
@@ -182,122 +181,3 @@ if check_login():
     # -------------------------------------------------------------------------
     # 메인 입력 폼 섹션 (숫자 입력 및 데이터 최종 저장)
     # -------------------------------------------------------------------------
-    with st.form(key=f"vehicle_form_{v}", clear_on_submit=False):
-        
-        st.markdown(f"**선택 차량:** {display_car_name} | **출발:** {final_start_node} ➔ **도착:** {final_end_node}")
-        st.divider()
-
-        col_start, col_end = st.columns(2)
-        with col_start:
-            # key 기반으로 저장 후 last_km로 깔끔하게 초기화되도록 세팅
-            start_km = st.number_input("📍 시작 거리 (km)", value=last_km, step=1, key=f"start_km_{v}")
-        with col_end:
-            end_km = st.number_input("🏁 종료 거리 (km)", value=start_km, step=1, help="시작 거리보다 큰 값을 입력하세요", key=f"end_km_{v}")
-
-        total_distance = end_km - start_km
-
-        st.divider()
-
-        st.markdown("### ⛽ 주유 기록 (선택 입력)")
-        col_fuel1, col_fuel2, col_fuel3 = st.columns(3)
-        with col_fuel1:
-            fuel_type = st.selectbox("연료 종류", ["없음", "경유", "LPG", "요소수"], key=f"fuel_type_{v}")
-        with col_fuel2:
-            fuel_amount = st.number_input("주입량 (L)", min_value=0, value=0, step=1, key=f"fuel_amt_{v}")
-        with col_fuel3:
-            fuel_price = st.number_input("결제 금액 (원)", min_value=0, value=0, step=1000, key=f"fuel_price_{v}")
-
-        st.divider()
-
-        # 저장 버튼 및 다중 클릭 제한 제어
-        submit_button = st.form_submit_button(
-            label="🚀 기록 저장" if not st.session_state.submit_disabled else "⏳ 데이터 전송 및 저장 중...",
-            use_container_width=True,
-            type="primary",
-            disabled=st.session_state.submit_disabled
-        )
-
-        if submit_button:
-            if not selected_driver:
-                st.error("운전자 성명이 입력되지 않았습니다!")
-            elif end_km < start_km:
-                st.error("종료 거리가 시작 거리보다 작을 수 없습니다!")
-            elif total_distance == 0:
-                # ✨ [실수 연타 완전 차단] 주행거리가 0km이면 입력을 전면 거부합니다.
-                st.error("주행 거리가 0 km입니다! 종료 거리를 전일 거리보다 크게 수정 후 저장해 주세요.")
-            else:
-                st.session_state.submit_disabled = True
-                
-                with st.spinner("구글 스프레드시트에 데이터를 안전하게 기록하고 있습니다..."):
-                    try:
-                        payload = {
-                            "날짜": selected_date.strftime('%Y-%m-%d'),
-                            "차량": actual_car_name,
-                            "운전자": selected_driver,
-                            "출발지": final_start_node,
-                            "목적지": final_end_node,
-                            "시작거리": int(start_km),
-                            "종료거리": int(end_km),
-                            "주행거리": int(total_distance),
-                            "운행내용": purpose,
-                            "비고": memo,
-                            "입력시간": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                            "연료종류": fuel_type if fuel_type != "없음" else "", 
-                            "주입량": int(fuel_amount) if fuel_amount > 0 else "",
-                            "결제금액": int(fuel_price) if fuel_price > 0 else ""
-                        }
-                        
-                        response = requests.post(WEB_APP_URL, data=json.dumps(payload))
-                        
-                        if response.status_code == 200:
-                            st.toast("✅ 구글 스프레드시트에 성공적으로 저장되었습니다!")
-                            st.cache_data.clear()
-                            
-                            # ✨ [핵심 리셋] 버전을 1 올려서 모든 직접 입력칸 및 위젯을 백지 상태로 강제 초기화
-                            st.session_state.form_version += 1
-                            st.session_state.submit_disabled = False
-                            st.rerun()
-                        else:
-                            st.error(f"저장 실패 (서버 응답 코드: {response.status_code})")
-                            st.session_state.submit_disabled = False
-                    except Exception as e:
-                        st.error(f"연결 오류가 발생했습니다: {e}")
-                        st.session_state.submit_disabled = False
-
-    # 5. 차량별 필터 및 데이터 테이블 뷰어
-    with st.expander("📊 최근 운행 및 주유 기록 보기"):
-        try:
-            history_df = load_live_data(current_ts)
-            
-            if not history_df.empty:
-                filter_options = ["전체 보기"] + ui_car_list
-                selected_filter = st.selectbox("🔍 조회할 차량을 선택하세요", filter_options, key="view_filter")
-                
-                history_df['차량'] = history_df['차량'].map(REVERSE_CAR_MAP).fillna(history_df['차량'])
-                history_df['차량'] = history_df['차량'].map(CAR_MAP).fillna(history_df['차량'])
-                history_df['출발지'] = history_df['출발지'].replace({"회사(전우정밀)": "회사"})
-                
-                if selected_filter != "전체 보기":
-                    display_df = history_df[history_df['차량'].str.contains(CAR_MAP[selected_filter], na=False)]
-                else:
-                    display_df = history_df
-                
-                if not display_df.empty:
-                    base_cols = ["날짜", "운전자", "주행거리", "시작거리", "종료거리", "출발지", "목적지", "운행내용", "비고", "연료종류", "주입량", "결제금액", "차량", "입력시간"]
-                    target_cols = [c for c in base_cols if c in display_df.columns]
-                    display_df = display_df[target_cols]
-                    
-                    final_df = display_df.tail(5).iloc[::-1].copy()
-                    
-                    for dist_col in ["주행거리", "시작거리", "종료거리"]:
-                        if dist_col in final_df.columns:
-                            final_df[dist_col] = final_df[dist_col].apply(lambda x: f"{x} km" if x != "" and pd.notna(x) else "")
-                    
-                    styled_df = final_df.style.apply(highlight_reconstructed, axis=1)
-                    st.dataframe(styled_df, use_container_width=True)
-                else:
-                    st.info(f"'{selected_filter}'의 운행 기록이 존재하지 않습니다.")
-            else:
-                st.info("표시할 기록이 없습니다.")
-        except Exception as e:
-            st.write("데이터를 불러오는 중입니다...")
