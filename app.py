@@ -128,7 +128,7 @@ if check_login():
         st.session_state.submit_disabled = False
 
     # -------------------------------------------------------------------------
-    # [버그 해결 핵심] 실시간 유기적 반응이 필요한 모든 UI를 Form 외부로 전면 분리
+    # [실시간 반응 UI] Form 외부 전면 배치 (운전자, 차량, 출발/목적지, 비고)
     # -------------------------------------------------------------------------
     selected_date = st.date_input("📅 운행 및 주유 날짜", datetime.now())
     
@@ -155,7 +155,7 @@ if check_login():
     # 실시간 최종 마일리지 계산
     last_km = get_last_dist(actual_car_name)
 
-    # 3. [개선] 출발지 및 목적지 선택 UI (모바일 키패드 충돌 해결을 위해 Form 외부 배치)
+    # 3. 출발지 및 목적지 선택 UI
     col_ui_start, col_ui_end = st.columns(2)
     with col_ui_start:
         start_node = st.selectbox("📍 출발지 선택", ["회사", "통근노선 시작", "직접 입력"])
@@ -166,6 +166,15 @@ if check_login():
         end_node = st.selectbox("🎯 목적지 선택", ["왜관(VPHC)", "AST(2공장)", "동아금속", "통근노선 종점", "직접 입력"])
         custom_end_node = st.text_input("✍️ [목적지 직접 입력시] 상세 주소/장소 입력", placeholder="예: 대구지점")
         final_end_node = custom_end_node.strip() if end_node == "직접 입력" else end_node
+
+    # 4. 운행 내용 선택
+    purpose = st.selectbox("📝 운행 내용", ["납품 및 업무협의", "통근버스 운행", "거래처 미팅", "현장 방문", "주유", "기타"])
+
+    # 5. [개선] 비고(특이사항) 체크박스 및 입력창 실시간화 (Form 외부로 격리)
+    show_memo = st.checkbox("📝 비고(특이사항) 작성하기")
+    memo = ""
+    if show_memo:
+        memo = st.text_area("특이사항 내용을 입력하세요", placeholder="예: 주유 정산 필요, 차량 소음 발생 등", height=100)
 
     # -------------------------------------------------------------------------
     # 메인 입력 폼 섹션 (숫자 입력 및 데이터 최종 저장)
@@ -193,15 +202,6 @@ if check_login():
             fuel_amount = st.number_input("주입량 (L)", min_value=0, value=0, step=1)
         with col_fuel3:
             fuel_price = st.number_input("결제 금액 (원)", min_value=0, value=0, step=1000)
-
-        st.divider()
-
-        purpose = st.selectbox("📝 운행 내용", ["납품 및 업무협의", "통근버스 운행", "거래처 미팅", "현장 방문", "주유", "기타"])
-        
-        show_memo = st.checkbox("📝 비고(특이사항) 작성하기")
-        memo = ""
-        if show_memo:
-            memo = st.text_area("특이사항 내용을 입력하세요", height=100)
 
         st.divider()
 
