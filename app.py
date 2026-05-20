@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
+from zoneinfo import ZoneInfo  # ✨ 한국 시간대 설정을 위한 라이브러리 추가
 import requests
 import json
 import numpy as np
@@ -105,7 +106,9 @@ if check_login():
         except Exception as e:
             return pd.DataFrame(columns=["날짜", "차량", "운전자", "출발지", "목적지", "시작거리", "종료거리", "주행거리", "운행내용", "비고", "입력시간", "연료종류", "주입량", "결제금액"])
 
-    current_ts = datetime.now().timestamp()
+    # 현재 시각 구하기 (한국 시간 기준 적용)
+    kst_now = datetime.now(ZoneInfo("Asia/Seoul"))
+    current_ts = kst_now.timestamp()
     
     def get_last_dist(car_full_name):
         try:
@@ -133,14 +136,14 @@ if check_login():
     # -------------------------------------------------------------------------
     # [실시간 반응 UI 및 메인 입력 폼]
     # -------------------------------------------------------------------------
-    selected_date = st.date_input("📅 운행 및 주유 날짜", datetime.now(), key=f"date_{v}")
+    selected_date = st.date_input("📅 운행 및 주유 날짜", kst_now, key=f"date_{v}")
     
     # 1. 운전자 선택 및 입력
     selected_driver_base = st.session_state.user_name if st.session_state.user_name != "관리자" else "목록에서 선택"
     if selected_driver_base == "목록에서 선택":
         selected_driver_base = st.selectbox("👤 운전자 선택", ["김동현", "김태종", "이학장"], key=f"driver_sel_{v}")
     
-    custom_driver_name = st.text_input("✍️ [목록에 이름이 없는 분만] 운전자 성명 직접 입력", placeholder="예: 박준석", key=f"driver_txt_{v}")
+    custom_driver_name = st.text_input("✍️ [목록에 이름이 없는 분만] 운전자 성명 직접 입력", placeholder="예: 김XX", key=f"driver_txt_{v}")
     selected_driver = custom_driver_name.strip() if custom_driver_name.strip() != "" else selected_driver_base
 
     # 2. 차량 선택
@@ -221,8 +224,11 @@ if check_login():
             else:
                 st.session_state.submit_disabled = True
                 
-                with st.spinner("구글 스프레드시트에 데이터를 안전하게 기록하고 있습니다..."):
+                with st.spinner("데이터가 저장되고 있습니다. 잠시만 기다려주세요..."):
                     try:
+                        # ✨ 구글 시트에 전송하기 직전, 실시간 한국 시각을 다시 한번 정확하게 계산합니다.
+                        save_kst_time = datetime.now(ZoneInfo("Asia/Seoul")).strftime('%Y-%m-%d %H:%M:%S')
+                        
                         payload = {
                             "날짜": selected_date.strftime('%Y-%m-%d'),
                             "차량": actual_car_name,
@@ -234,7 +240,7 @@ if check_login():
                             "주행거리": int(total_distance),
                             "운행내용": purpose,
                             "비고": memo,
-                            "입력시간": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                            "입력시간": save_kst_time,  # ✨ 한국 표준시(KST) 문자열 저장
                             "연료종류": fuel_type if fuel_type != "없음" else "", 
                             "주입량": int(fuel_amount) if fuel_amount > 0 else "",
                             "결제금액": int(fuel_price) if fuel_price > 0 else ""
@@ -257,20 +263,17 @@ if check_login():
                         st.session_state.submit_disabled = False
 
     # -------------------------------------------------------------------------
-    # 5. [버그 완벽 해결] 차량별 필터 및 데이터 테이블 뷰어 고정 배치
+    # 5. 차량별 필터 및 데이터 테이블 뷰어 고정 배치
     # -------------------------------------------------------------------------
-    st.write("") # 미세 여백 추가
+    st.write("") 
     with st.expander("📊 최근 운행 및 주유 기록 보기", expanded=True):
         try:
-            # 카운터 버전과 무관하게 상시 최신 타임스탬프로 실시간 로드하도록 분리
-            history_df = load_live_data(datetime.now().timestamp())
+            history_df = load_live_data(datetime.now(ZoneInfo("Asia/Seoul")).timestamp())
             
             if not history_df.empty:
-                # 필터 드롭박스의 key도 버전에 영향받지 않게 고정값으로 세팅
                 filter_options = ["전체 보기"] + ui_car_list
                 selected_filter = st.selectbox("🔍 조회할 차량을 선택하세요", filter_options, key="fixed_view_filter")
                 
-                # 데이터 정제 및 동기화
                 history_df['차량'] = history_df['차량'].map(REVERSE_CAR_MAP).fillna(history_df['차량'])
                 
                 if selected_filter != "전체 보기":
