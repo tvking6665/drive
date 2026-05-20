@@ -284,3 +284,19 @@ if check_login():
                 if not display_df.empty:
                     base_cols = ["날짜", "운전자", "주행거리", "시작거리", "종료거리", "출발지", "목적지", "운행내용", "비고", "연료종류", "주입량", "결제금액", "차량", "입력시간"]
                     target_cols = [c for c in base_cols if c in display_df.columns]
+                    display_df = display_df[target_cols]
+                    
+                    final_df = display_df.tail(5).iloc[::-1].copy()
+                    
+                    for dist_col in ["주행거리", "시작거리", "종료거리"]:
+                        if dist_col in final_df.columns:
+                            final_df[dist_col] = final_df[dist_col].apply(lambda x: f"{x} km" if x != "" and pd.notna(x) else "")
+                    
+                    styled_df = final_df.style.apply(highlight_reconstructed, axis=1)
+                    st.dataframe(styled_df, use_container_width=True)
+                else:
+                    st.info(f"'{CAR_MAP.get(selected_filter, selected_filter)}'의 운행 기록이 존재하지 않습니다.")
+            else:
+                st.info("표시할 기록이 없습니다.")
+        except Exception as e:
+            st.write("데이터를 불러오는 중입니다...")
