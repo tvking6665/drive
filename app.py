@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
-from zoneinfo import ZoneInfo  # ✨ 한국 시간대 설정을 위한 라이브러리 추가
+from zoneinfo import ZoneInfo
 import requests
 import json
 import numpy as np
@@ -19,6 +19,7 @@ st.markdown("""
     .main-title { font-size: 24px !important; font-weight: bold; margin-bottom: 10px; display: flex; align-items: center; }
     div[data-testid="stExpander"] div[role="button"] p { font-weight: bold; color: #2e7d32; }
     div[data-testid="stForm"] { border: none !important; padding: 0 !important; }
+    .summary-box { background-color: #f8f9fa; padding: 15px; border-radius: 8px; border-left: 5px solid #1976d2; margin-bottom: 15px; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -31,6 +32,7 @@ USER_PW = {
     "이학장": "0000"
 }
 
+# [그랜저 삭제] 실제 운행하시는 4대 체제로 원복
 CAR_MAP = {
     "7.5톤": "7.5톤(파비스)",
     "2.5톤": "2.5톤(마이티)",
@@ -97,11 +99,6 @@ if check_login():
                     df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0).astype(int)
             
             df = df.replace({np.nan: ""})
-            if "주입량" in df.columns:
-                df["주입량"] = df["주입량"].replace({0: ""})
-            if "결제금액" in df.columns:
-                df["결제금액"] = df["결제금액"].replace({0: ""})
-                
             return df
         except Exception as e:
             return pd.DataFrame(columns=["날짜", "차량", "운전자", "출발지", "목적지", "시작거리", "종료거리", "주행거리", "운행내용", "비고", "입력시간", "연료종류", "주입량", "결제금액"])
@@ -110,10 +107,12 @@ if check_login():
     kst_now = datetime.now(ZoneInfo("Asia/Seoul"))
     current_ts = kst_now.timestamp()
     
+    # 실시간 원본 데이터 가져오기
+    live_df = load_live_data(current_ts)
+    
     def get_last_dist(car_full_name):
         try:
-            df = load_live_data(current_ts)
-            car_df = df[df['차량'] == car_full_name]
+            car_df = live_df[live_df['차량'] == car_full_name]
             if not car_df.empty:
                 return int(car_df.iloc[-1]['종료거리'])
             return 0
@@ -143,10 +142,10 @@ if check_login():
     if selected_driver_base == "목록에서 선택":
         selected_driver_base = st.selectbox("👤 운전자 선택", ["김동현", "김태종", "이학장"], key=f"driver_sel_{v}")
     
-    custom_driver_name = st.text_input("✍️ [목록에 이름이 없는 분만] 운전자 성명 직접 입력", placeholder="예: 김XX", key=f"driver_txt_{v}")
+    custom_driver_name = st.text_input("✍️ [목록에 이름이 없는 분만] 운전자 성명 직접 입력", placeholder="예: 박준석", key=f"driver_txt_{v}")
     selected_driver = custom_driver_name.strip() if custom_driver_name.strip() != "" else selected_driver_base
 
-    # 2. 차량 선택
+    # 2. 차량 선택 (그랜저 제거)
     ui_car_list = ["7.5톤", "2.5톤", "1톤", "통근차"]
     default_car_index = 0
     if selected_driver in DRIVER_DEFAULT_CAR:
@@ -226,7 +225,6 @@ if check_login():
                 
                 with st.spinner("데이터가 저장되고 있습니다. 잠시만 기다려주세요..."):
                     try:
-                        # ✨ 구글 시트에 전송하기 직전, 실시간 한국 시각을 다시 한번 정확하게 계산합니다.
                         save_kst_time = datetime.now(ZoneInfo("Asia/Seoul")).strftime('%Y-%m-%d %H:%M:%S')
                         
                         payload = {
@@ -240,7 +238,7 @@ if check_login():
                             "주행거리": int(total_distance),
                             "운행내용": purpose,
                             "비고": memo,
-                            "입력시간": save_kst_time,  # ✨ 한국 표준시(KST) 문자열 저장
+                            "입력시간": save_kst_time,
                             "연료종류": fuel_type if fuel_type != "없음" else "", 
                             "주입량": int(fuel_amount) if fuel_amount > 0 else "",
                             "결제금액": int(fuel_price) if fuel_price > 0 else ""
@@ -263,17 +261,65 @@ if check_login():
                         st.session_state.submit_disabled = False
 
     # -------------------------------------------------------------------------
-    # 5. 차량별 필터 및 데이터 테이블 뷰어 고정 배치
+    # 5. 차량별 실시간 누적 요약 표 (그랜저 제외 4대 체제)
     # -------------------------------------------------------------------------
-    st.write("") 
+    st.write("")
+    st.markdown("---")
+    
+    show_summary_table = st.checkbox("📊 차량별 누적 요약 표 보기 (주행거리 / LPG금액 / 경유주입량)")
+    
+    if show_summary_table:
+        st.markdown("<div class='summary-box'><h4>📈 차량별 실시간 누적 데이터 요약</h4></div>", unsafe_allow_html=True)
+        
+        if not live_df.empty:
+            summary_records = []
+            
+            # [그랜저 제거] 실제 운행 데이터 요약 목록도 4대로 한정
+            for car_key in ["7.5톤", "2.5톤", "1톤", "통근차"]:
+                full_name = CAR_FULL_NAME_MAP[car_key]
+                display_name = CAR_MAP[car_key]
+                
+                car_data = live_df[live_df['차량'] == full_name]
+                
+                # 1. 주행거리 합계
+                total_dist = 0
+                if '주행거리' in car_data.columns:
+                    total_dist = pd.to_numeric(car_data['주행거리'], errors='coerce').fillna(0).sum()
+                
+                # 2. LPG 금액 합계
+                lpg_amt = 0
+                if '결제금액' in car_data.columns and '연료종류' in car_data.columns:
+                    lpg_data = car_data[car_data['연료종류'].str.strip() == 'LPG']
+                    lpg_amt = pd.to_numeric(lpg_data['결제금액'], errors='coerce').fillna(0).sum()
+                
+                # 3. 경유 주입량 합계
+                diesel_liters = 0
+                if '주입량' in car_data.columns and '연료종류' in car_data.columns:
+                    diesel_data = car_data[car_data['연료종류'].str.strip() == '경유']
+                    diesel_liters = pd.to_numeric(diesel_data['주입량'], errors='coerce').fillna(0).sum()
+                
+                summary_records.append({
+                    "차종": display_name,
+                    "주행거리": f"{int(total_dist):,} km",
+                    "LPG금액": f"{int(lpg_amt):,} 원" if lpg_amt > 0 else "-",
+                    "경유주입량": f"{int(diesel_liters):,} L" if diesel_liters > 0 else "-"
+                })
+            
+            summary_df = pd.DataFrame(summary_records)
+            st.dataframe(summary_df, use_container_width=True, hide_index=True)
+        else:
+            st.info("요약할 데이터가 아직 구글 시트에 없습니다.")
+            
+    # -------------------------------------------------------------------------
+    # 6. 최근 기록 보기 테이블 뷰어 (그랜저 제외 고정)
+    # -------------------------------------------------------------------------
     with st.expander("📊 최근 운행 및 주유 기록 보기", expanded=True):
         try:
-            history_df = load_live_data(datetime.now(ZoneInfo("Asia/Seoul")).timestamp())
-            
-            if not history_df.empty:
-                filter_options = ["전체 보기"] + ui_car_list
+            if not live_df.empty:
+                filter_options = ["전체 보기"] + ["7.5톤", "2.5톤", "1톤", "통근차"]
                 selected_filter = st.selectbox("🔍 조회할 차량을 선택하세요", filter_options, key="fixed_view_filter")
                 
+                history_df = live_df.copy()
                 history_df['차량'] = history_df['차량'].map(REVERSE_CAR_MAP).fillna(history_df['차량'])
                 
                 if selected_filter != "전체 보기":
