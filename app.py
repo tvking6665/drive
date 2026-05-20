@@ -123,7 +123,7 @@ if check_login():
     # 입력 UI 구성
     selected_date = st.date_input("📅 운행 및 주유 날짜", datetime.now())
     
-    # [변경] 운전자 선택을 차량 선택보다 위로 배치하여 연동이 자연스럽게 보이도록 수정
+    # 운전자 선택을 차량 선택보다 위로 배치하여 연동이 자연스럽게 보이도록 수정
     selected_driver = st.session_state.user_name if st.session_state.user_name != "관리자" else "직접 입력"
     if selected_driver == "직접 입력":
         selected_driver = st.selectbox("👤 운전자 선택", ["김동현", "김태종", "이학장", "직접 입력"])
@@ -149,7 +149,6 @@ if check_login():
     
     col_start, col_end = st.columns(2)
     with col_start:
-        # [변경] 회사(전우정밀) 대신 '회사'로 깔끔하게 변경
         start_node = st.selectbox("📍 출발지", ["회사", "통근노선 시작", "직접 입력"])
         if start_node == "직접 입력": 
             start_node = st.text_input("출발지 상세")
@@ -185,45 +184,68 @@ if check_login():
     if show_memo:
         memo = st.text_area("특이사항 내용을 입력하세요", height=100)
 
-    # 4. 기록 저장 로직
-    if st.button("🚀 기록 저장", use_container_width=True, type="primary"):
+    # -------------------------------------------------------------------------
+    # 4. 기록 저장 로직 (★ 중복 클릭 및 연타 방지 기능 전면 반영)
+    # -------------------------------------------------------------------------
+    if "is_saving" not in st.session_state:
+        st.session_state.is_saving = False
+
+    def trigger_save():
+        st.session_state.is_saving = True
+
+    # 저장 중일 때는 버튼이 흐려지며(disabled=True) 클릭이 차단됩니다.
+    if st.button(
+        "🚀 기록 저장" if not st.session_state.is_saving else "⏳ 데이터 전송 및 저장 중...", 
+        use_container_width=True, 
+        type="primary",
+        disabled=st.session_state.is_saving,
+        on_click=trigger_save
+    ):
         if end_km < start_km:
             st.error("종료 거리가 시작 거리보다 작을 수 없습니다!")
+            st.session_state.is_saving = False  # 유효성 검사 실패 시 버튼 재활성화
         else:
-            try:
-                # 시트 저장 시 '회사'를 기존 데이터 연속성을 위해 '회사(전우정밀)'로 치환하여 저장
-                save_start_node = "회사(전우정밀)" if start_node == "회사" else start_node
-                
-                payload = {
-                    "날짜": selected_date.strftime('%Y-%m-%d'),
-                    "차량": actual_car_name,
-                    "운전자": selected_driver,
-                    "출발지": save_start_node,
-                    "목적지": end_node,
-                    "시작거리": int(start_km),
-                    "종료거리": int(end_km),
-                    "주행거리": int(total_distance),
-                    "운행내용": purpose,
-                    "비고": memo,
-                    "입력시간": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                    "연료종류": fuel_type if fuel_type != "없음" else "", 
-                    "주입량": int(fuel_amount) if fuel_amount > 0 else "",
-                    "결제금액": int(fuel_price) if fuel_price > 0 else ""
-                }
-                
-                response = requests.post(WEB_APP_URL, data=json.dumps(payload))
-                
-                if response.status_code == 200:
-                    st.success("구글 스프레드시트에 성공적으로 저장되었습니다!")
-                    st.balloons()
-                    st.cache_data.clear()
-                    st.rerun()
-                else:
-                    st.error(f"저장 실패 (서버 응답 코드: {response.status_code})")
-            except Exception as e:
-                st.error(f"연결 오류가 발생했습니다: {e}")
+            # 전송 중일 때 화면에 로딩 스피너 및 대기 문구 출력
+            with st.spinner("구글 스프레드시트에 데이터를 안전하게 기록하고 있습니다. 잠시만 기다려주세요..."):
+                try:
+                    # 시트 저장 시 '회사'를 기존 데이터 연속성을 위해 '회사(전우정밀)'로 치환하여 저장
+                    save_start_node = "회사(전우정밀)" if start_node == "회사" else start_node
+                    
+                    payload = {
+                        "날짜": selected_date.strftime('%Y-%m-%d'),
+                        "차량": actual_car_name,
+                        "운전자": selected_driver,
+                        "출발지": save_start_node,
+                        "목적지": end_node,
+                        "시작거리": int(start_km),
+                        "종료거리": int(end_km),
+                        "주행거리": int(total_distance),
+                        "운행내용": purpose,
+                        "비고": memo,
+                        "입력시간": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                        "연료종류": fuel_type if fuel_type != "없음" else "", 
+                        "주입량": int(fuel_amount) if fuel_amount > 0 else "",
+                        "결제금액": int(fuel_price) if fuel_price > 0 else ""
+                    }
+                    
+                    response = requests.post(WEB_APP_URL, data=json.dumps(payload))
+                    
+                    if response.status_code == 200:
+                        st.success("구글 스프레드시트에 성공적으로 저장되었습니다!")
+                        st.balloons()
+                        st.cache_data.clear()
+                        
+                        # 전송 완료 후 상태값 리셋 및 새로고침
+                        st.session_state.is_saving = False
+                        st.rerun()
+                    else:
+                        st.error(f"저장 실패 (서버 응답 코드: {response.status_code})")
+                        st.session_state.is_saving = False  # 실패 시 버튼 재활성화
+                except Exception as e:
+                    st.error(f"연결 오류가 발생했습니다: {e}")
+                    st.session_state.is_saving = False  # 오류 발생 시 버튼 재활성화
 
-    # 5. 차량별 필터 및 데이터 테이블 뷰어 (요청 순서 전면 개편)
+    # 5. 차량별 필터 및 데이터 테이블 뷰어
     with st.expander("📊 최근 운행 및 주유 기록 보기 (차량별 필터 지원)"):
         try:
             history_df = load_live_data()
@@ -242,14 +264,13 @@ if check_login():
                     display_df = history_df
                 
                 if not display_df.empty:
-                    # ✨ [거리단위 추가 및 정렬 순서 전면 개편] 날짜 -> 운전자 -> 주행거리 -> 시작거리 -> 종료거리 -> 출발지 -> 목적지 순
                     base_cols = ["날짜", "운전자", "주행거리", "시작거리", "종료거리", "출발지", "목적지", "운행내용", "비고", "연료종류", "주입량", "결제금액", "차량", "입력시간"]
                     target_cols = [c for c in base_cols if c in display_df.columns]
                     display_df = display_df[target_cols]
                     
                     final_df = display_df.tail(5).iloc[::-1].copy()
                     
-                    # ✨ 거리에 관련된 숫자 뒤에 ' km' 붙여주기
+                    # 거리에 관련된 숫자 뒤에 ' km' 붙여주기
                     for dist_col in ["주행거리", "시작거리", "종료거리"]:
                         if dist_col in final_df.columns:
                             final_df[dist_col] = final_df[dist_col].apply(lambda x: f"{x} km" if x != "" and pd.notna(x) else "")
