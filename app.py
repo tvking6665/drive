@@ -17,7 +17,6 @@ st.markdown("""
     <style>
     .main-title { font-size: 24px !important; font-weight: bold; margin-bottom: 10px; display: flex; align-items: center; }
     div[data-testid="stExpander"] div[role="button"] p { font-weight: bold; color: #2e7d32; }
-    /* 폼 테두리 투명화 처리로 기존 UI 디자인 유지 */
     div[data-testid="stForm"] { border: none !important; padding: 0 !important; }
     </style>
     """, unsafe_allow_html=True)
@@ -31,7 +30,6 @@ USER_PW = {
     "이학장": "0000"
 }
 
-# 차량 이름 변환 딕셔너리
 CAR_MAP = {
     "7.5톤": "7.5톤(파비스) 3528",
     "2.5톤": "2.5톤(마이티) 8569",
@@ -40,7 +38,6 @@ CAR_MAP = {
 }
 REVERSE_CAR_MAP = {v: k for k, v in CAR_MAP.items()}
 
-# 운전자별 기본 매핑 차량 설정
 DRIVER_DEFAULT_CAR = {
     "김동현": "7.5톤",
     "김태종": "1톤",
@@ -70,7 +67,6 @@ def check_login():
         return False
     return True
 
-# 3. 메인 화면 (로그인 성공 시 실행)
 if check_login():
     if st.sidebar.button("로그아웃"):
         st.session_state.login_success = False
@@ -82,12 +78,11 @@ if check_login():
     with col2:
         st.markdown(f'<p class="main-title">차량 운행 및 주유 기록부 ({st.session_state.user_name}님)</p>', unsafe_allow_html=True)
 
-    # 데이터 실시간 로드 함수
+    # 데이터 실시간 로드 함수 (시간초 캐시 버스팅 강화)
     @st.cache_data(ttl=0)
-    def load_live_data():
+    def load_live_data(timestamp):
         try:
-            df = pd.read_csv(f"{CSV_URL}&timestamp={datetime.now().timestamp()}")
-            
+            df = pd.read_csv(f"{CSV_URL}&timestamp={timestamp}")
             int_columns = ["시작거리", "종료거리", "주행거리", "주입량", "결제금액"]
             for col in int_columns:
                 if col in df.columns:
@@ -103,9 +98,12 @@ if check_login():
         except Exception as e:
             return pd.DataFrame(columns=["날짜", "차량", "운전자", "출발지", "목적지", "시작거리", "종료거리", "주행거리", "운행내용", "비고", "입력시간", "연료종류", "주입량", "결제금액"])
 
+    # 강제 리프레시용 타임스탬프 발행
+    current_ts = datetime.now().timestamp()
+    
     def get_last_dist(car_full_name):
         try:
-            df = load_live_data()
+            df = load_live_data(current_ts)
             car_df = df[df['차량'] == car_full_name]
             if not car_df.empty:
                 return int(car_df.iloc[-1]['종료거리'])
@@ -118,21 +116,30 @@ if check_login():
             return ['background-color: #fff9c4; color: black; font-weight: bold;'] * len(row)
         return [''] * len(row)
 
-    # 중복 클릭 차단 및 전송 프로세스용 세션 상태 정의
     if "submit_disabled" not in st.session_state:
         st.session_state.submit_disabled = False
 
-    # 입력 UI 구성을 전체적으로 하나의 Form으로 감싸서 다중 이벤트를 차단합니다.
+    # -------------------------------------------------------------------------
+    # 메인 입력 폼 섹션
+    # -------------------------------------------------------------------------
     with st.form(key="vehicle_form", clear_on_submit=False):
         
-        # 입력 UI 구성
         selected_date = st.date_input("📅 운행 및 주유 날짜", datetime.now())
         
-        selected_driver = st.session_state.user_name if st.session_state.user_name != "관리자" else "직접 입력"
-        if selected_driver == "직접 입력":
-            selected_driver = st.selectbox("👤 운전자 선택", ["김동현", "김태종", "이학장", "직접 입력"])
-            if selected_driver == "직접 입력":
-                selected_driver = st.text_input("운전자 성명 입력")
+        # [모바일 키패드 개선 적용] 운전자 선택 UI 전면 개편
+        selected_driver_base = st.session_state.user_name if st.session_state.user_name != "관리자" else "목록에서 선택"
+        
+        if selected_driver_base == "목록에서 선택":
+            selected_driver_base = st.selectbox("👤 운전자 선택", ["김동현", "김태종", "이학장", "목록에 없음 (직접입력)"])
+        
+        # 키패드 활성화를 위해 상시 배치형 텍스트 입력창으로 구조 변경
+        custom_driver_name = st.text_input("✍️ [목록에 없음 선택시] 운전자 성명을 직접 입력하세요", placeholder="예: 박준석")
+        
+        # 최종 데이터에 담길 운전자 확정 논리
+        if selected_driver_base == "목록에 없음 (직접입력)":
+            selected_driver = custom_driver_name.strip()
+        else:
+            selected_driver = selected_driver_base
 
         ui_car_list = ["7.5톤", "2.5톤", "1톤", "통근차"]
         default_car_index = 0
@@ -147,7 +154,7 @@ if check_login():
 
         st.divider()
 
-        # 주행 거리 정보
+        # [시작거리 연동 강화] 실시간 시트 마일리지를 안전하게 바인딩
         last_km = get_last_dist(actual_car_name)
         
         col_start, col_end = st.columns(2)
@@ -155,6 +162,7 @@ if check_login():
             start_node = st.selectbox("📍 출발지", ["회사", "통근노선 시작", "직접 입력"])
             if start_node == "직접 입력": 
                 start_node = st.text_input("출발지 상세")
+            # 강제로 실시간 최종 마일리지를 초기값(value)으로 주입합니다.
             start_km = st.number_input("📍 시작 거리 (km)", value=last_km, step=1)
 
         with col_end:
@@ -167,7 +175,6 @@ if check_login():
 
         st.divider()
 
-        # 주유 및 연료 기록 섹션
         st.markdown("### ⛽ 주유 기록 (선택 입력)")
         col_fuel1, col_fuel2, col_fuel3 = st.columns(3)
         
@@ -189,10 +196,7 @@ if check_login():
 
         st.divider()
 
-        # -------------------------------------------------------------------------
-        # 4. 기록 저장 로직 (★ 연타 및 무한 로딩 잔상 완벽 해결 버젼)
-        # -------------------------------------------------------------------------
-        # 버튼 자체의 비활성화 조건과 내부 로직 검증을 유기적으로 연동합니다.
+        # 저장 버튼 및 다중 클릭 제한 제어
         submit_button = st.form_submit_button(
             label="🚀 기록 저장" if not st.session_state.submit_disabled else "⏳ 데이터 전송 및 저장 중...",
             use_container_width=True,
@@ -201,10 +205,11 @@ if check_login():
         )
 
         if submit_button:
-            if end_km < start_km:
+            if not selected_driver:
+                st.error("운전자 성명이 입력되지 않았습니다. 직접 입력칸을 확인해주세요!")
+            elif end_km < start_km:
                 st.error("종료 거리가 시작 거리보다 작을 수 없습니다!")
             else:
-                # [핵심] 진입 즉시 세션 변수를 가동하여 추가 클릭 및 백그라운드 재트리거 원천 차단
                 st.session_state.submit_disabled = True
                 
                 with st.spinner("구글 스프레드시트에 데이터를 안전하게 기록하고 있습니다. 잠시만 기다려주세요..."):
@@ -232,9 +237,8 @@ if check_login():
                         
                         if response.status_code == 200:
                             st.toast("✅ 구글 스프레드시트에 성공적으로 저장되었습니다!")
+                            # [중요] 저장 즉시 기존 캐시 데이터를 완전히 소멸시켜 다음 로드시 무조건 새 값을 읽게 함
                             st.cache_data.clear()
-                            
-                            # 저장이 끝난 후 변수를 해제하고 리런하여 클린한 상태로 화면 갱신
                             st.session_state.submit_disabled = False
                             st.rerun()
                         else:
@@ -247,13 +251,12 @@ if check_login():
     # 5. 차량별 필터 및 데이터 테이블 뷰어
     with st.expander("📊 최근 운행 및 주유 기록 보기 (차량별 필터 지원)"):
         try:
-            history_df = load_live_data()
+            history_df = load_live_data(current_ts)
             
             if not history_df.empty:
                 filter_options = ["전체 보기"] + ui_car_list
                 selected_filter = st.selectbox("🔍 조회할 차량을 선택하세요", filter_options, key="view_filter")
                 
-                # 데이터 전처리: 풀네임을 짧은 UI 이름으로 변환하고 '회사(전우정밀)'을 '회사'로 일괄 치환
                 history_df['차량'] = history_df['차량'].map(REVERSE_CAR_MAP).fillna(history_df['차량'])
                 history_df['출발지'] = history_df['출발지'].replace({"회사(전우정밀)": "회사"})
                 
@@ -269,7 +272,6 @@ if check_login():
                     
                     final_df = display_df.tail(5).iloc[::-1].copy()
                     
-                    # 거리에 관련된 숫자 뒤에 ' km' 붙여주기
                     for dist_col in ["주행거리", "시작거리", "종료거리"]:
                         if dist_col in final_df.columns:
                             final_df[dist_col] = final_df[dist_col].apply(lambda x: f"{x} km" if x != "" and pd.notna(x) else "")
