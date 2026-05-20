@@ -128,17 +128,18 @@ if check_login():
         st.session_state.submit_disabled = False
 
     # -------------------------------------------------------------------------
-    # [실시간 반응 UI] Form 외부 전면 배치 (운전자, 차량, 출발/목적지, 비고)
+    # [UI 대수술] 드롭박스에서 '직접입력' 항목 자르고 상시 텍스트 연동 체제로 전환
     # -------------------------------------------------------------------------
     selected_date = st.date_input("📅 운행 및 주유 날짜", datetime.now())
     
     # 1. 운전자 선택 및 입력
     selected_driver_base = st.session_state.user_name if st.session_state.user_name != "관리자" else "목록에서 선택"
     if selected_driver_base == "목록에서 선택":
-        selected_driver_base = st.selectbox("👤 운전자 선택", ["김동현", "김태종", "이학장", "목록에 없음 (직접입력)"])
+        selected_driver_base = st.selectbox("👤 운전자 선택", ["김동현", "김태종", "이학장"])
     
-    custom_driver_name = st.text_input("✍️ [목록에 없음 선택시] 운전자 성명을 직접 입력하세요", placeholder="예: 박준석")
-    selected_driver = custom_driver_name.strip() if selected_driver_base == "목록에 없음 (직접입력)" else selected_driver_base
+    # 직접 입력창에 글자가 들어가면 무조건 직접 입력된 값으로 확정 처리
+    custom_driver_name = st.text_input("✍️ [목록에 이름이 없는 분만] 운전자 성명 직접 입력", placeholder="예: 박준석")
+    selected_driver = custom_driver_name.strip() if custom_driver_name.strip() != "" else selected_driver_base
 
     # 2. 차량 선택
     ui_car_list = ["7.5톤", "2.5톤", "1톤", "통근차"]
@@ -155,22 +156,24 @@ if check_login():
     # 실시간 최종 마일리지 계산
     last_km = get_last_dist(actual_car_name)
 
-    # 3. 출발지 및 목적지 선택 UI
+    # 3. 출발지 및 목적지 선택 UI (드롭박스에서 '직접 입력' 옵션 제거)
     col_ui_start, col_ui_end = st.columns(2)
     with col_ui_start:
-        start_node = st.selectbox("📍 출발지 선택", ["회사", "통근노선 시작", "직접 입력"])
-        custom_start_node = st.text_input("✍️ [출발지 직접 입력시] 상세 주소/장소 입력", placeholder="예: 경산공장")
-        final_start_node = custom_start_node.strip() if start_node == "직접 입력" else ("회사(전우정밀)" if start_node == "회사" else start_node)
+        start_node = st.selectbox("📍 출발지 선택", ["회사", "통근노선 시작"])
+        custom_start_node = st.text_input("✍️ [기타 장소 출발시] 출발지 직접 입력", placeholder="예: 외주공장명, 주소 등")
+        # 직접 입력 칸에 값이 채워져 있으면 우선 반영
+        final_start_node = custom_start_node.strip() if custom_start_node.strip() != "" else ("회사(전우정밀)" if start_node == "회사" else start_node)
 
     with col_ui_end:
-        end_node = st.selectbox("🎯 목적지 선택", ["왜관(VPHC)", "AST(2공장)", "동아금속", "통근노선 종점", "직접 입력"])
-        custom_end_node = st.text_input("✍️ [목적지 직접 입력시] 상세 주소/장소 입력", placeholder="예: 대구지점")
-        final_end_node = custom_end_node.strip() if end_node == "직접 입력" else end_node
+        end_node = st.selectbox("🎯 목적지 선택", ["왜관(VPHC)", "AST(2공장)", "동아금속", "통근노선 종점"])
+        custom_end_node = st.text_input("✍️ [기타 장소 도착시] 목적지 직접 입력", placeholder="예: 거래처명, 주소 등")
+        # 직접 입력 칸에 값이 채워져 있으면 우선 반영
+        final_end_node = custom_end_node.strip() if custom_end_node.strip() != "" else end_node
 
     # 4. 운행 내용 선택
     purpose = st.selectbox("📝 운행 내용", ["납품 및 업무협의", "통근버스 운행", "거래처 미팅", "현장 방문", "주유", "기타"])
 
-    # 5. [개선] 비고(특이사항) 체크박스 및 입력창 실시간화 (Form 외부로 격리)
+    # 5. 비고(특이사항) 체크박스 및 입력창
     show_memo = st.checkbox("📝 비고(특이사항) 작성하기")
     memo = ""
     if show_memo:
@@ -216,10 +219,6 @@ if check_login():
         if submit_button:
             if not selected_driver:
                 st.error("운전자 성명이 입력되지 않았습니다!")
-            elif start_node == "직접 입력" and not custom_start_node:
-                st.error("출발지 내용을 직접 입력해주세요!")
-            elif end_node == "직접 입력" and not custom_end_node:
-                st.error("목적지 내용을 직접 입력해주세요!")
             elif end_km < start_km:
                 st.error("종료 거리가 시작 거리보다 작을 수 없습니다!")
             else:
@@ -233,65 +232,4 @@ if check_login():
                             "운전자": selected_driver,
                             "출발지": final_start_node,
                             "목적지": final_end_node,
-                            "시작거리": int(start_km),
-                            "종료거리": int(end_km),
-                            "주행거리": int(total_distance),
-                            "운행내용": purpose,
-                            "비고": memo,
-                            "입력시간": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                            "연료종류": fuel_type if fuel_type != "없음" else "", 
-                            "주입량": int(fuel_amount) if fuel_amount > 0 else "",
-                            "결제금액": int(fuel_price) if fuel_price > 0 else ""
-                        }
-                        
-                        response = requests.post(WEB_APP_URL, data=json.dumps(payload))
-                        
-                        if response.status_code == 200:
-                            st.toast("✅ 구글 스프레드시트에 성공적으로 저장되었습니다!")
-                            st.cache_data.clear()
-                            st.session_state.submit_disabled = False
-                            st.rerun()
-                        else:
-                            st.error(f"저장 실패 (서버 응답 코드: {response.status_code})")
-                            st.session_state.submit_disabled = False
-                    except Exception as e:
-                        st.error(f"연결 오류가 발생했습니다: {e}")
-                        st.session_state.submit_disabled = False
-
-    # 5. 차량별 필터 및 데이터 테이블 뷰어
-    with st.expander("📊 최근 운행 및 주유 기록 보기"):
-        try:
-            history_df = load_live_data(current_ts)
-            
-            if not history_df.empty:
-                filter_options = ["전체 보기"] + ui_car_list
-                selected_filter = st.selectbox("🔍 조회할 차량을 선택하세요", filter_options, key="view_filter")
-                
-                history_df['차량'] = history_df['차량'].map(REVERSE_CAR_MAP).fillna(history_df['차량'])
-                history_df['차량'] = history_df['차량'].map(CAR_MAP).fillna(history_df['차량'])
-                history_df['출발지'] = history_df['출발지'].replace({"회사(전우정밀)": "회사"})
-                
-                if selected_filter != "전체 보기":
-                    display_df = history_df[history_df['차량'].str.contains(CAR_MAP[selected_filter], na=False)]
-                else:
-                    display_df = history_df
-                
-                if not display_df.empty:
-                    base_cols = ["날짜", "운전자", "주행거리", "시작거리", "종료거리", "출발지", "목적지", "운행내용", "비고", "연료종류", "주입량", "결제금액", "차량", "입력시간"]
-                    target_cols = [c for c in base_cols if c in display_df.columns]
-                    display_df = display_df[target_cols]
-                    
-                    final_df = display_df.tail(5).iloc[::-1].copy()
-                    
-                    for dist_col in ["주행거리", "시작거리", "종료거리"]:
-                        if dist_col in final_df.columns:
-                            final_df[dist_col] = final_df[dist_col].apply(lambda x: f"{x} km" if x != "" and pd.notna(x) else "")
-                    
-                    styled_df = final_df.style.apply(highlight_reconstructed, axis=1)
-                    st.dataframe(styled_df, use_container_width=True)
-                else:
-                    st.info(f"'{selected_filter}'의 운행 기록이 존재하지 않습니다.")
-            else:
-                st.info("표시할 기록이 없습니다.")
-        except Exception as e:
-            st.write("데이터를 불러오는 중입니다...")
+                            "시
