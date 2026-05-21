@@ -32,7 +32,7 @@ USER_PW = {
     "이학장": "0000"
 }
 
-# [그랜저 삭제] 실제 운행하시는 4대 체제로 원복
+# 실제 운행하시는 4대 체제 맵핑
 CAR_MAP = {
     "7.5톤": "7.5톤(파비스)",
     "2.5톤": "2.5톤(마이티)",
@@ -110,13 +110,28 @@ if check_login():
     # 실시간 원본 데이터 가져오기
     live_df = load_live_data(current_ts)
     
-    def get_last_dist(car_full_name):
+    # [수정된 핵심 로직] 차량 핵심 키워드로 구글 시트에서 안전하게 이전 종료거리 조회
+    def get_last_dist(car_ui_key):
         try:
-            car_df = live_df[live_df['차량'] == car_full_name]
+            if live_df.empty or '차량' not in live_df.columns:
+                return 0
+                
+            full_name = CAR_FULL_NAME_MAP.get(car_ui_key, "")
+            short_name = CAR_MAP.get(car_ui_key, car_ui_key)
+            
+            # 완전 일치 방식이 아닌 텍스트 '포함(contains)' 방식으로 필터링하여 매칭 실패 원천 차단
+            car_df = live_df[
+                live_df['차량'].astype(str).str.contains(car_ui_key, na=False) | 
+                live_df['차량'].astype(str).str.contains(short_name, na=False) | 
+                live_df['차량'].astype(str).str.contains(full_name, na=False)
+            ]
+            
             if not car_df.empty:
-                return int(car_df.iloc[-1]['종료거리'])
+                last_row = car_df.iloc[-1]
+                if '종료거리' in car_df.columns and str(last_row['종료거리']).strip() != "":
+                    return int(float(last_row['종료거리']))
             return 0
-        except:
+        except Exception as e:
             return 0
 
     def highlight_reconstructed(row):
@@ -145,7 +160,7 @@ if check_login():
     custom_driver_name = st.text_input("✍️ [목록에 이름이 없는 분만] 운전자 성명 직접 입력", placeholder="예: 박준석", key=f"driver_txt_{v}")
     selected_driver = custom_driver_name.strip() if custom_driver_name.strip() != "" else selected_driver_base
 
-    # 2. 차량 선택 (그랜저 제거)
+    # 2. 차량 선택
     ui_car_list = ["7.5톤", "2.5톤", "1톤", "통근차"]
     default_car_index = 0
     if selected_driver in DRIVER_DEFAULT_CAR:
@@ -157,7 +172,8 @@ if check_login():
     display_car_name = CAR_MAP[selected_car_ui]
     actual_car_name = CAR_FULL_NAME_MAP[selected_car_ui]
 
-    last_km = get_last_dist(actual_car_name)
+    # [수정 호출부] 셀렉트박스 선택값(예: "1톤")을 다이렉트로 집어넣어 동적 매칭 유도
+    last_km = get_last_dist(selected_car_ui)
 
     # 3. 출발지 및 목적지 선택 UI
     col_ui_start, col_ui_end = st.columns(2)
@@ -187,6 +203,7 @@ if check_login():
 
         col_start, col_end = st.columns(2)
         with col_start:
+            # 실시간 추출한 전일 종료거리가 자동으로 디폴트 값 맵핑됨
             start_km = st.number_input("📍 시작 거리 (km)", value=last_km, step=1, key=f"start_km_{v}")
         with col_end:
             end_km = st.number_input("🏁 종료 거리 (km)", value=start_km, step=1, help="시작 거리보다 큰 값을 입력하세요", key=f"end_km_{v}")
@@ -274,12 +291,11 @@ if check_login():
         if not live_df.empty:
             summary_records = []
             
-            # [그랜저 제거] 실제 운행 데이터 요약 목록도 4대로 한정
             for car_key in ["7.5톤", "2.5톤", "1톤", "통근차"]:
                 full_name = CAR_FULL_NAME_MAP[car_key]
                 display_name = CAR_MAP[car_key]
                 
-                car_data = live_df[live_df['차량'] == full_name]
+                car_data = live_df[live_df['차량'].astype(str).str.contains(car_key, na=False)]
                 
                 # 1. 주행거리 합계
                 total_dist = 0
