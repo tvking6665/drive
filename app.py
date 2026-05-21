@@ -88,17 +88,23 @@ if check_login():
     with col2:
         st.markdown(f'<p class="main-title">차량 운행 및 주유 기록부 ({st.session_state.user_name}님)</p>', unsafe_allow_html=True)
 
-    # 데이터 실시간 로드 함수
+    # 데이터 실시간 로드 함수 (순서 고정 및 에러 방지 강화)
     @st.cache_data(ttl=0)
     def load_live_data(timestamp):
         try:
             df = pd.read_csv(f"{CSV_URL}&timestamp={timestamp}")
+            
+            # 숫자형 데이터 변환 전처리 강화
             int_columns = ["시작거리", "종료거리", "주행거리", "주입량", "결제금액"]
             for col in int_columns:
                 if col in df.columns:
                     df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0).astype(int)
             
-            df = df.replace({np.nan: ""})
+            # 숫자가 아닌 나머지 열의 빈값(NaN)만 안전하게 빈 문자열 처리
+            string_cols = [c for c in df.columns if c not in int_columns]
+            for col in string_cols:
+                df[col] = df[col].fillna("").astype(str)
+                
             return df
         except Exception as e:
             return pd.DataFrame(columns=["날짜", "차량", "운전자", "출발지", "목적지", "시작거리", "종료거리", "주행거리", "운행내용", "비고", "입력시간", "연료종류", "주입량", "결제금액"])
@@ -110,7 +116,7 @@ if check_login():
     # 실시간 원본 데이터 가져오기
     live_df = load_live_data(current_ts)
     
-    # [수정된 핵심 로직] 차량 핵심 키워드로 구글 시트에서 안전하게 이전 종료거리 조회
+    # [완전 보완] 공백 제거 및 포함 조건식 정밀 매칭
     def get_last_dist(car_ui_key):
         try:
             if live_df.empty or '차량' not in live_df.columns:
@@ -119,17 +125,19 @@ if check_login():
             full_name = CAR_FULL_NAME_MAP.get(car_ui_key, "")
             short_name = CAR_MAP.get(car_ui_key, car_ui_key)
             
-            # 완전 일치 방식이 아닌 텍스트 '포함(contains)' 방식으로 필터링하여 매칭 실패 원천 차단
+            # 시트 내 텍스트 공백 부조화 문제를 해결하기 위해 양끝 공백을 자르고 비교
+            # "1톤", "1톤(포터)", "1톤(포터) 5378" 중 하나라도 걸리면 매칭되도록 보완
             car_df = live_df[
-                live_df['차량'].astype(str).str.contains(car_ui_key, na=False) | 
-                live_df['차량'].astype(str).str.contains(short_name, na=False) | 
-                live_df['차량'].astype(str).str.contains(full_name, na=False)
+                live_df['차량'].str.strip().str.contains(car_ui_key, na=False) | 
+                live_df['차량'].str.strip().str.contains(short_name, na=False) | 
+                live_df['차량'].str.strip().str.contains(full_name, na=False)
             ]
             
             if not car_df.empty:
-                last_row = car_df.iloc[-1]
-                if '종료거리' in car_df.columns and str(last_row['종료거리']).strip() != "":
-                    return int(float(last_row['종료거리']))
+                # 가장 마지막 기록의 종료거리 컬럼 값 추출
+                last_val = car_df.iloc[-1]['종료거리']
+                if pd.notna(last_val) and str(last_val).strip() != "" and str(last_val).strip() != "0":
+                    return int(last_val)
             return 0
         except Exception as e:
             return 0
@@ -172,7 +180,7 @@ if check_login():
     display_car_name = CAR_MAP[selected_car_ui]
     actual_car_name = CAR_FULL_NAME_MAP[selected_car_ui]
 
-    # [수정 호출부] 셀렉트박스 선택값(예: "1톤")을 다이렉트로 집어넣어 동적 매칭 유도
+    # [중요 수정] 선택창의 순수 키 문자열("1톤", "2.5톤" 등)을 사용하여 최신 종료거리 함수 호출
     last_km = get_last_dist(selected_car_ui)
 
     # 3. 출발지 및 목적지 선택 UI
@@ -203,10 +211,10 @@ if check_login():
 
         col_start, col_end = st.columns(2)
         with col_start:
-            # 실시간 추출한 전일 종료거리가 자동으로 디폴트 값 맵핑됨
-            start_km = st.number_input("📍 시작 거리 (km)", value=last_km, step=1, key=f"start_km_{v}")
+            # 보완된 최신 종료거리 데이터가 기본값(value)으로 주입됩니다.
+            start_km = st.number_input("📍 시작 거리 (km)", value=int(last_km), step=1, key=f"start_km_{v}")
         with col_end:
-            end_km = st.number_input("🏁 종료 거리 (km)", value=start_km, step=1, help="시작 거리보다 큰 값을 입력하세요", key=f"end_km_{v}")
+            end_km = st.number_input("🏁 종료 거리 (km)", value=int(start_km), step=1, help="시작 거리보다 큰 값을 입력하세요", key=f"end_km_{v}")
 
         total_distance = end_km - start_km
 
@@ -355,7 +363,8 @@ if check_login():
                     
                     for dist_col in ["주행거리", "시작거리", "종료거리"]:
                         if dist_col in final_df.columns:
-                            final_df[dist_col] = final_df[dist_col].apply(lambda x: f"{x} km" if x != "" and pd.notna(x) else "")
+                            # 0이나 공백이 아니라면 단위 추가
+                            final_df[dist_col] = final_df[dist_col].apply(lambda x: f"{int(x)} km" if x != "" and pd.notna(x) and x != 0 else "0 km")
                     
                     styled_df = final_df.style.apply(highlight_reconstructed, axis=1)
                     st.dataframe(styled_df, use_container_width=True)
