@@ -209,12 +209,24 @@ if check_login():
         st.markdown(f"**선택 차량:** {display_car_name} | **출발:** {final_start_node} ➔ **도착:** {final_end_node}")
         st.divider()
 
-        col_start, col_end = st.columns(2)
+       col_start, col_end = st.columns(2)
         with col_start:
-            # 보완된 최신 종료거리 데이터가 기본값(value)으로 주입됩니다.
-            start_km = st.number_input("📍 시작 거리 (km)", value=int(last_km), step=1, key=f"start_km_{v}")
+            # key에 selected_car_ui를 결합하여 차량이 바뀔 때마다 입력창을 실시간으로 새로 갱신하게 만듭니다.
+            start_km = st.number_input(
+                "📍 시작 거리 (km)", 
+                value=int(last_km), 
+                step=1, 
+                key=f"start_km_{selected_car_ui}_{v}"
+            )
         with col_end:
-            end_km = st.number_input("🏁 종료 거리 (km)", value=int(start_km), step=1, help="시작 거리보다 큰 값을 입력하세요", key=f"end_km_{v}")
+            # 종료 거리도 시작 거리에 연동되어 함께 리셋되도록 key를 맞춰줍니다.
+            end_km = st.number_input(
+                "🏁 종료 거리 (km)", 
+                value=int(start_km), 
+                step=1, 
+                help="시작 거리보다 큰 값을 입력하세요", 
+                key=f"end_km_{selected_car_ui}_{v}"
+            )
 
         total_distance = end_km - start_km
 
