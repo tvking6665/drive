@@ -207,7 +207,6 @@ if check_login():
         st.markdown(f"**선택 차량:** {display_car_name} | **출발:** {final_start_node} ➔ **도착:** {final_end_node}")
         st.divider()
 
-        # 들여쓰기 에러가 났던 지점 - 완벽 정렬 조치 완료
         col_start, col_end = st.columns(2)
         with col_start:
             start_km = st.number_input(
@@ -295,7 +294,7 @@ if check_login():
                         st.session_state.submit_disabled = False
 
     # -------------------------------------------------------------------------
-    # 5. 차량별 실시간 누적 요약 표 (그랜저 제외 4대 체제)
+    # 5. 차량별 실시간 누적 요약 표 (월별 필터 반영 기능 고도화)
     # -------------------------------------------------------------------------
     st.write("")
     st.markdown("---")
@@ -306,13 +305,31 @@ if check_login():
         st.markdown("<div class='summary-box'><h4>📈 차량별 실시간 누적 데이터 요약</h4></div>", unsafe_allow_html=True)
         
         if not live_df.empty:
+            # 안전하게 날짜 컬럼 파싱 (날짜 형식이 텍스트로 틀어지는 현상 방지)
+            live_df['datetime_parsed'] = pd.to_datetime(live_df['날짜'], errors='coerce')
+            
+            # 구글 시트에 있는 데이터 기반으로 고유 월 목록 추출 (최신 월순 정렬)
+            available_months = live_df['datetime_parsed'].dt.strftime('%Y-%m').dropna().unique()
+            available_months = sorted(list(available_months), reverse=True)
+            
+            # 오늘(6월) 데이터가 아직 없을 경우를 대비하여 현재 월 강제 삽입 방어 코드
+            current_month_str = kst_now.strftime('%Y-%m')
+            if current_month_str not in available_months:
+                available_months.insert(0, current_month_str)
+            
+            # 월 선택 UI
+            selected_month = st.selectbox("📅 조회할 월을 선택하세요", available_months, index=0)
+            
+            # 선택된 월 데이터로 필터링
+            monthly_filtered_df = live_df[live_df['datetime_parsed'].dt.strftime('%Y-%m') == selected_month]
+            
             summary_records = []
             
             for car_key in ["7.5톤", "2.5톤", "1톤", "통근차"]:
-                full_name = CAR_FULL_NAME_MAP[car_key]
                 display_name = CAR_MAP[car_key]
                 
-                car_data = live_df[live_df['차량'].astype(str).str.contains(car_key, na=False)]
+                # 해당 월 데이터 중 특정 차종만 재필터링
+                car_data = monthly_filtered_df[monthly_filtered_df['차량'].astype(str).str.contains(car_key, na=False)]
                 
                 # 1. 주행거리 합계
                 total_dist = 0
@@ -333,12 +350,13 @@ if check_login():
                 
                 summary_records.append({
                     "차종": display_name,
-                    "주행거리": f"{int(total_dist):,} km",
+                    "주행거리": f"{int(total_dist):,} km" if total_dist > 0 else "0 km",
                     "LPG금액": f"{int(lpg_amt):,} 원" if lpg_amt > 0 else "-",
                     "경유주입량": f"{int(diesel_liters):,} L" if diesel_liters > 0 else "-"
                 })
             
             summary_df = pd.DataFrame(summary_records)
+            st.markdown(f"##### 📌 **{selected_month}** 운행/주유 데이터 요약 결과")
             st.dataframe(summary_df, use_container_width=True, hide_index=True)
         else:
             st.info("요약할 데이터가 아직 구글 시트에 없습니다.")
