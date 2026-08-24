@@ -24,10 +24,10 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # 2. 사원 로그인 데이터 설정
-USER_LIST = ["선택하세요", "관리자", "김태종", "김동현", "이학장"]
+USER_LIST = ["선택하세요", "관리자", "김현준", "김동현", "이학장"]
 USER_PW = {
     "관리자": "1111",
-    "김태종": "0000",
+    "김현준": "0000",
     "김동현": "0000",
     "이학장": "0000"
 }
@@ -50,7 +50,7 @@ REVERSE_CAR_MAP = {v: k for k, v in CAR_FULL_NAME_MAP.items()}
 
 DRIVER_DEFAULT_CAR = {
     "김동현": "7.5톤",
-    "김태종": "1톤",
+    "김현준": "1톤",
     "이학장": "1톤"
 }
 
@@ -160,7 +160,7 @@ if check_login():
     # 1. 운전자 선택 및 입력
     selected_driver_base = st.session_state.user_name if st.session_state.user_name != "관리자" else "목록에서 선택"
     if selected_driver_base == "목록에서 선택":
-        selected_driver_base = st.selectbox("👤 운전자 선택", ["김동현", "김태종", "이학장"], key=f"driver_sel_{v}")
+        selected_driver_base = st.selectbox("👤 운전자 선택", ["김동현", "김현준", "이학장"], key=f"driver_sel_{v}")
     
     custom_driver_name = st.text_input("✍️ [목록에 이름이 없는 분만] 운전자 성명 직접 입력", placeholder="예: 박준석", key=f"driver_txt_{v}")
     selected_driver = custom_driver_name.strip() if custom_driver_name.strip() != "" else selected_driver_base
