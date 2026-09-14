@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>차량 운행일지 등록</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: #f4f5f7;
+      margin: 0;
+      padding: 20px;
+      display: flex;
+      justify-content: center;
+    }
+    .card {
+      background: white;
+      width: 100%;
+      max-width: 480px;
+      padding: 24px;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    }
+    h2 {
+      margin-top: 0;
+      color: #1e293b;
+      font-size: 20px;
+      text-align: center;
+    }
+    .form-group {
+      margin-bottom: 16px;
+    }
+    label {
+      display: block;
+      margin-bottom: 6px;
+      font-weight: 600;
+      font-size: 14px;
+      color: #334155;
+    }
+    input, select, textarea {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      font-size: 15px;
+      box-sizing: border-box;
+    }
+    input:focus, select:focus, textarea:focus {
+      outline: none;
+      border-color: #2563eb;
+    }
+    button {
+      width: 100%;
+      background-color: #2563eb;
+      color: white;
+      border: none;
+      padding: 12px;
+      border-radius: 6px;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+      margin-top: 8px;
+    }
+    button:disabled {
+      background-color: #94a3b8;
+    }
+    #statusMsg {
+      margin-top: 15px;
+      text-align: center;
+      font-size: 14px;
+      font-weight: 500;
+    }
+  </style>
+</head>
+<body>
+
+<div class="card">
+  <h2>차량 운행일지 기록</h2>
+  <form id="carForm">
+    <div class="form-group">
+      <label for="carNumber">차량 선택</label>
+      <select id="carNumber" required>
+        <option value="">차량을 선택하세요</option>
+        <option value="파비스 3528">파비스 3528</option>
+        <option value="마이티 8569">마이티 8569</option>
+        <option value="포터 5378">포터 5378</option>
+        <option value="솔라티 8740">솔라티 8740</option>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label for="driver">운전자</label>
+      <input type="text" id="driver" placeholder="운전자 이름" required>
+    </div>
+
+    <div class="form-group">
+      <label for="mileage">현재 주행거리 (km)</label>
+      <input type="number" id="mileage" placeholder="예: 125400" required>
+    </div>
+
+    <div class="form-group">
+      <label for="note">비고 (목적지 / 주유 등)</label>
+      <textarea id="note" rows="3" placeholder="특이사항 입력"></textarea>
+    </div>
+
+    <button type="submit" id="submitBtn">기록 저장하기</button>
+  </form>
+  <div id="statusMsg"></div>
+</div>
+
+<script>
+  // 나중에 구글 웹앱 URL 나오면 여기에 넣을 자리입니다.
+  const GAS_URL = "여기에_구글_웹앱_URL을_붙여넣으세요";
+
+  const form = document.getElementById("carForm");
+  const submitBtn = document.getElementById("submitBtn");
+  const statusMsg = document.getElementById("statusMsg");
+
+  form.addEventListener("submit", function(e) {
+    e.preventDefault();
+    submitBtn.disabled = true;
+    statusMsg.style.color = "#2563eb";
+    statusMsg.textContent = "구글 시트에 저장 중...";
+
+    const payload = {
+      carNumber: document.getElementById("carNumber").value,
+      driver: document.getElementById("driver").value,
+      mileage: document.getElementById("mileage").value,
+      note: document.getElementById("note").value
+    };
+
+    fetch(GAS_URL, {
+      method: "POST",
+      mode: "no-cors",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(payload)
+    })
+    .then(() => {
+      statusMsg.style.color = "#16a34a";
+      statusMsg.textContent = "정상적으로 등록되었습니다!";
+      form.reset();
+      submitBtn.disabled = false;
+    })
+    .catch((err) => {
+      statusMsg.style.color = "#dc2626";
+      statusMsg.textContent = "전송 실패: " + err.message;
+      submitBtn.disabled = false;
+    });
+  });
+</script>
+
+</body>
+</html>
