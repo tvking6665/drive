@@ -3,150 +3,485 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>차량 운행일지 등록</title>
+  <title>전우정밀 차량 운행 및 주유 기록부</title>
   <style>
+    * { box-sizing: border-box; }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      background-color: #f4f5f7;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Malgun Gothic", sans-serif;
+      background-color: #f1f5f9;
       margin: 0;
-      padding: 20px;
+      padding: 16px;
       display: flex;
       justify-content: center;
-    }
-    .card {
-      background: white;
-      width: 100%;
-      max-width: 480px;
-      padding: 24px;
-      border-radius: 12px;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-    }
-    h2 {
-      margin-top: 0;
       color: #1e293b;
-      font-size: 20px;
-      text-align: center;
     }
-    .form-group {
+    .container {
+      width: 100%;
+      max-width: 520px;
+      background: #ffffff;
+      border-radius: 12px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+      padding: 20px;
+    }
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 2px solid #e2e8f0;
+      padding-bottom: 12px;
       margin-bottom: 16px;
     }
+    .header h2 { margin: 0; font-size: 18px; color: #0f172a; }
+    .btn-logout {
+      background: #ef4444;
+      color: white;
+      border: none;
+      padding: 6px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: bold;
+    }
+    .form-group { margin-bottom: 14px; }
     label {
       display: block;
-      margin-bottom: 6px;
-      font-weight: 600;
-      font-size: 14px;
+      margin-bottom: 5px;
+      font-size: 13px;
+      font-weight: bold;
       color: #334155;
     }
     input, select, textarea {
       width: 100%;
-      padding: 10px;
+      padding: 9px 12px;
       border: 1px solid #cbd5e1;
       border-radius: 6px;
-      font-size: 15px;
-      box-sizing: border-box;
+      font-size: 14px;
+      background-color: #fff;
     }
     input:focus, select:focus, textarea:focus {
       outline: none;
       border-color: #2563eb;
+      box-shadow: 0 0 0 2px rgba(37,99,235,0.2);
     }
-    button {
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+    .card-box {
+      background-color: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 14px;
+    }
+    .card-title {
+      font-size: 14px;
+      font-weight: bold;
+      color: #2563eb;
+      margin-bottom: 8px;
+    }
+    .summary-text {
+      font-size: 13px;
+      color: #475569;
+      background: #eff6ff;
+      border-left: 4px solid #2563eb;
+      padding: 8px 12px;
+      border-radius: 4px;
+      margin-bottom: 14px;
+      font-weight: 500;
+    }
+    button[type="submit"], .btn-primary {
       width: 100%;
-      background-color: #2563eb;
+      background: #2563eb;
       color: white;
       border: none;
       padding: 12px;
-      border-radius: 6px;
-      font-size: 16px;
+      border-radius: 8px;
+      font-size: 15px;
       font-weight: bold;
       cursor: pointer;
-      margin-top: 8px;
     }
-    button:disabled {
-      background-color: #94a3b8;
-    }
-    #statusMsg {
-      margin-top: 15px;
+    button:disabled { background: #94a3b8; cursor: not-allowed; }
+    #msg {
+      margin-top: 14px;
+      padding: 10px;
+      border-radius: 6px;
       text-align: center;
       font-size: 14px;
-      font-weight: 500;
+      font-weight: bold;
+      display: none;
     }
+    .success { background-color: #dcfce7; color: #166534; display: block !important; }
+    .error { background-color: #fee2e2; color: #991b1b; display: block !important; }
+    .sub-input { margin-top: 6px; }
   </style>
 </head>
 <body>
 
-<div class="card">
-  <h2>차량 운행일지 기록</h2>
-  <form id="carForm">
+<div class="container">
+
+  <!-- 1. 로그인 화면 -->
+  <div id="loginView">
+    <h2 style="text-align: center; margin-top: 0; margin-bottom: 20px;">🔐 전우정밀 시스템 로그인</h2>
     <div class="form-group">
-      <label for="carNumber">차량 선택</label>
-      <select id="carNumber" required>
-        <option value="">차량을 선택하세요</option>
-        <option value="파비스 3528">파비스 3528</option>
-        <option value="마이티 8569">마이티 8569</option>
-        <option value="포터 5378">포터 5378</option>
-        <option value="솔라티 8740">솔라티 8740</option>
+      <label>사용자 선택</label>
+      <select id="loginUser">
+        <option value="">선택하세요</option>
+        <option value="관리자">관리자</option>
+        <option value="김현준">김현준</option>
+        <option value="김동현">김동현</option>
+        <option value="이학장">이학장</option>
       </select>
     </div>
-
     <div class="form-group">
-      <label for="driver">운전자</label>
-      <input type="text" id="driver" placeholder="운전자 이름" required>
+      <label>비밀번호</label>
+      <input type="password" id="loginPw" placeholder="비밀번호 입력">
+    </div>
+    <button type="button" class="btn-primary" onclick="handleLogin()">로그인</button>
+  </div>
+
+  <!-- 2. 운행일지 작성 화면 -->
+  <div id="mainView" style="display: none;">
+    <div class="header">
+      <h2>차량 운행/주유 기록부 (<span id="userBadge" style="color: #2563eb;"></span>)</h2>
+      <button class="btn-logout" onclick="handleLogout()">로그아웃</button>
     </div>
 
-    <div class="form-group">
-      <label for="mileage">현재 주행거리 (km)</label>
-      <input type="number" id="mileage" placeholder="예: 125400" required>
+    <div class="summary-text" id="routeSummary">
+      선택 차량: - | 출발: 회사 ➔ 도착: 왜관(VPHC)
     </div>
 
-    <div class="form-group">
-      <label for="note">비고 (목적지 / 주유 등)</label>
-      <textarea id="note" rows="3" placeholder="특이사항 입력"></textarea>
-    </div>
+    <form id="vehicleForm">
+      <!-- 날짜 -->
+      <div class="form-group">
+        <label>📅 운행 및 주유 날짜</label>
+        <input type="date" id="driveDate" required>
+      </div>
 
-    <button type="submit" id="submitBtn">기록 저장하기</button>
-  </form>
-  <div id="statusMsg"></div>
+      <!-- 운전자 -->
+      <div class="form-group">
+        <label>👤 운전자 성명</label>
+        <div id="driverSelectWrap">
+          <select id="driverSelect">
+            <option value="김현준">김현준</option>
+            <option value="김동현">김동현</option>
+            <option value="이학장">이학장</option>
+          </select>
+        </div>
+        <input type="text" id="driverCustom" class="sub-input" placeholder="✍️ [목록에 없는 분만] 운전자 직접 입력">
+      </div>
+
+      <!-- 차량 선택 -->
+      <div class="form-group">
+        <label>🚗 차량 선택</label>
+        <select id="carKey" onchange="onCarChange()">
+          <option value="7.5톤">7.5톤(파비스) 3528</option>
+          <option value="2.5톤">2.5톤(마이티) 8569</option>
+          <option value="1톤">1톤(포터) 5378</option>
+          <option value="통근차">통근차(솔라티) 8740</option>
+        </select>
+      </div>
+
+      <!-- 출발지 및 목적지 -->
+      <div class="grid-2">
+        <div class="form-group">
+          <label>📍 출발지</label>
+          <select id="startSelect" onchange="updateSummary()">
+            <option value="회사(전우정밀)">회사</option>
+            <option value="통근노선 시작">통근노선 시작</option>
+          </select>
+          <input type="text" id="startCustom" class="sub-input" placeholder="직접 입력" oninput="updateSummary()">
+        </div>
+        <div class="form-group">
+          <label>🎯 목적지</label>
+          <select id="endSelect" onchange="updateSummary()">
+            <option value="왜관(VPHC)">왜관(VPHC)</option>
+            <option value="AST(2공장)">AST(2공장)</option>
+            <option value="동아금속">동아금속</option>
+            <option value="통근노선 종점">통근노선 종점</option>
+          </select>
+          <input type="text" id="endCustom" class="sub-input" placeholder="직접 입력" oninput="updateSummary()">
+        </div>
+      </div>
+
+      <!-- 운행 내용 -->
+      <div class="form-group">
+        <label>📝 운행 내용</label>
+        <select id="purpose">
+          <option value="납품 및 업무협의">납품 및 업무협의</option>
+          <option value="통근버스 운행">통근버스 운행</option>
+          <option value="거래처 미팅">거래처 미팅</option>
+          <option value="현장 방문">현장 방문</option>
+          <option value="주유">주유</option>
+          <option value="기타">기타</option>
+        </select>
+      </div>
+
+      <!-- 주행 거리 박스 -->
+      <div class="card-box">
+        <div class="card-title">🛣️ 주행거리 산출 (km)</div>
+        <div class="grid-3">
+          <div>
+            <label style="font-size: 11px;">시작거리</label>
+            <input type="number" id="startKm" value="0" oninput="calcDistance()" required>
+          </div>
+          <div>
+            <label style="font-size: 11px;">종료거리</label>
+            <input type="number" id="endKm" value="0" oninput="calcDistance()" required>
+          </div>
+          <div>
+            <label style="font-size: 11px;">주행거리</label>
+            <input type="number" id="totalDistance" value="0" readonly style="background: #e2e8f0; font-weight: bold;">
+          </div>
+        </div>
+      </div>
+
+      <!-- 주유 기록 박스 -->
+      <div class="card-box">
+        <div class="card-title">⛽ 주유 기록 (선택 사항)</div>
+        <div class="grid-3">
+          <div>
+            <label style="font-size: 11px;">연료 종류</label>
+            <select id="fuelType">
+              <option value="없음">없음</option>
+              <option value="경유">경유</option>
+              <option value="LPG">LPG</option>
+              <option value="요소수">요소수</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size: 11px;">주입량 (L)</label>
+            <input type="number" id="fuelAmount" min="0" value="0">
+          </div>
+          <div>
+            <label style="font-size: 11px;">금액 (원)</label>
+            <input type="number" id="fuelPrice" min="0" value="0" step="1000">
+          </div>
+        </div>
+      </div>
+
+      <!-- 비고 -->
+      <div class="form-group">
+        <label>📝 특이사항 (비고)</label>
+        <textarea id="memo" rows="2" placeholder="차량 이상 증상, 주유 내역 등 입력"></textarea>
+      </div>
+
+      <button type="submit" id="submitBtn">🚀 기록 저장하기</button>
+    </form>
+
+    <div id="msg"></div>
+  </div>
+
 </div>
 
 <script>
-  // 나중에 구글 웹앱 URL 나오면 여기에 넣을 자리입니다.
-  const GAS_URL = "여기에_구글_웹앱_URL을_붙여넣으세요";
+  // 1. 신규 구글 스프레드시트 및 Apps Script 배포 URL 세팅 완료
+  const SHEET_ID = "1ZiLamZZuSsHZtO00fa8-bKPSVYfCiKMhtZOddU7O49o";
+  const CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=0`;
+  const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyq0yIctzaAByhpLPR2skU2sNouES6VoxbKbN3GwL6wuDo_P-KrucCGOkQpsdZsc-BA_g/exec";
 
-  const form = document.getElementById("carForm");
-  const submitBtn = document.getElementById("submitBtn");
-  const statusMsg = document.getElementById("statusMsg");
+  // 2. 사원 계정 & 기본 맵핑 데이터
+  const USER_PW = { "관리자": "1111", "김현준": "0000", "김동현": "0000", "이학장": "0000" };
+  const CAR_FULL_NAME = {
+    "7.5톤": "7.5톤(파비스) 3528",
+    "2.5톤": "2.5톤(마이티) 8569",
+    "1톤": "1톤(포터) 5378",
+    "통근차": "통근차(솔라티) 8740"
+  };
+  const DRIVER_DEFAULT_CAR = { "김동현": "7.5톤", "김현준": "1톤", "이학장": "1톤" };
 
-  form.addEventListener("submit", function(e) {
+  let currentUser = "";
+  let sheetHistoryData = [];
+
+  document.getElementById("driveDate").valueAsDate = new Date();
+
+  // 최신 시트 데이터 동기화 (최근 종료거리 자동 계산용)
+  function fetchSheetData() {
+    fetch(`${CSV_URL}&_ts=${new Date().getTime()}`)
+      .then(res => res.text())
+      .then(csvText => {
+        const rows = csvText.trim().split("\n").map(r => r.split(","));
+        if (rows.length > 1) {
+          const headers = rows[0].map(h => h.trim().replace(/"/g, ''));
+          sheetHistoryData = rows.slice(1).map(row => {
+            const obj = {};
+            row.forEach((val, i) => {
+              if (headers[i]) obj[headers[i]] = val.trim().replace(/"/g, '');
+            });
+            return obj;
+          });
+          onCarChange();
+        }
+      })
+      .catch(err => console.log("시트 동기화 대기 중..."));
+  }
+
+  function handleLogin() {
+    const user = document.getElementById("loginUser").value;
+    const pw = document.getElementById("loginPw").value;
+
+    if (!user) {
+      alert("사용자를 선택해주세요.");
+      return;
+    }
+    if (USER_PW[user] !== pw) {
+      alert("비밀번호가 일치하지 않습니다.");
+      return;
+    }
+
+    currentUser = user;
+    document.getElementById("userBadge").textContent = user;
+    document.getElementById("loginView").style.display = "none";
+    document.getElementById("mainView").style.display = "block";
+
+    if (user !== "관리자") {
+      document.getElementById("driverSelectWrap").style.display = "none";
+      if (DRIVER_DEFAULT_CAR[user]) {
+        document.getElementById("carKey").value = DRIVER_DEFAULT_CAR[user];
+      }
+    } else {
+      document.getElementById("driverSelectWrap").style.display = "block";
+    }
+    updateSummary();
+    fetchSheetData();
+  }
+
+  function handleLogout() {
+    currentUser = "";
+    document.getElementById("loginPw").value = "";
+    document.getElementById("mainView").style.display = "none";
+    document.getElementById("loginView").style.display = "block";
+  }
+
+  function calcDistance() {
+    const start = Number(document.getElementById("startKm").value) || 0;
+    const end = Number(document.getElementById("endKm").value) || 0;
+    const total = end - start;
+    document.getElementById("totalDistance").value = total >= 0 ? total : 0;
+  }
+
+  function updateSummary() {
+    const carKey = document.getElementById("carKey").value;
+    const carName = CAR_FULL_NAME[carKey];
+    
+    const startCustom = document.getElementById("startCustom").value.trim();
+    const startFinal = startCustom || document.getElementById("startSelect").value;
+
+    const endCustom = document.getElementById("endCustom").value.trim();
+    const endFinal = endCustom || document.getElementById("endSelect").value;
+
+    document.getElementById("routeSummary").textContent = 
+      `선택 차량: ${carName} | 출발: ${startFinal} ➔ 도착: ${endFinal}`;
+  }
+
+  function onCarChange() {
+    updateSummary();
+    const carKey = document.getElementById("carKey").value;
+
+    // 시트에서 해당 차량의 마지막 종료거리 자동 추출
+    const carRows = sheetHistoryData.filter(r => r["차량"] && r["차량"].includes(carKey));
+    if (carRows.length > 0) {
+      const lastRow = carRows[carRows.length - 1];
+      const lastKm = Number(lastRow["종료거리"]) || 0;
+      if (lastKm > 0) {
+        document.getElementById("startKm").value = lastKm;
+        document.getElementById("endKm").value = lastKm;
+        calcDistance();
+        return;
+      }
+    }
+    document.getElementById("startKm").value = 0;
+    document.getElementById("endKm").value = 0;
+    calcDistance();
+  }
+
+  // 폼 전송
+  document.getElementById("vehicleForm").addEventListener("submit", function(e) {
     e.preventDefault();
-    submitBtn.disabled = true;
-    statusMsg.style.color = "#2563eb";
-    statusMsg.textContent = "구글 시트에 저장 중...";
+
+    const startKm = Number(document.getElementById("startKm").value) || 0;
+    const endKm = Number(document.getElementById("endKm").value) || 0;
+    const totalDist = endKm - startKm;
+
+    if (endKm < startKm) {
+      alert("종료 거리가 시작 거리보다 작을 수 없습니다!");
+      return;
+    }
+    if (totalDist === 0) {
+      alert("주행 거리가 0 km입니다! 종료 거리를 수정해 주세요.");
+      return;
+    }
+
+    const driverCustom = document.getElementById("driverCustom").value.trim();
+    let finalDriver = driverCustom;
+    if (!finalDriver) {
+      finalDriver = (currentUser === "관리자") ? document.getElementById("driverSelect").value : currentUser;
+    }
+
+    const startCustom = document.getElementById("startCustom").value.trim();
+    const finalStart = startCustom || document.getElementById("startSelect").value;
+
+    const endCustom = document.getElementById("endCustom").value.trim();
+    const finalEnd = endCustom || document.getElementById("endSelect").value;
+
+    const fuelTypeVal = document.getElementById("fuelType").value;
+    const fuelAmtVal = Number(document.getElementById("fuelAmount").value) || 0;
+    const fuelPriceVal = Number(document.getElementById("fuelPrice").value) || 0;
+
+    const now = new Date();
+    const kstTime = now.toLocaleString("ko-KR", { timeZone: "Asia/Seoul" });
 
     const payload = {
-      carNumber: document.getElementById("carNumber").value,
-      driver: document.getElementById("driver").value,
-      mileage: document.getElementById("mileage").value,
-      note: document.getElementById("note").value
+      "날짜": document.getElementById("driveDate").value,
+      "차량": CAR_FULL_NAME[document.getElementById("carKey").value],
+      "운전자": finalDriver,
+      "출발지": finalStart,
+      "목적지": finalEnd,
+      "시작거리": startKm,
+      "종료거리": endKm,
+      "주행거리": totalDist,
+      "운행내용": document.getElementById("purpose").value,
+      "비고": document.getElementById("memo").value,
+      "입력시간": kstTime,
+      "연료종류": fuelTypeVal !== "없음" ? fuelTypeVal : "",
+      "주입량": fuelAmtVal > 0 ? fuelAmtVal : "",
+      "결제금액": fuelPriceVal > 0 ? fuelPriceVal : ""
     };
 
-    fetch(GAS_URL, {
+    const submitBtn = document.getElementById("submitBtn");
+    const msg = document.getElementById("msg");
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = "⏳ 데이터 전송 및 저장 중...";
+    msg.className = "";
+    msg.style.display = "none";
+
+    fetch(WEB_APP_URL, {
       method: "POST",
       mode: "no-cors",
-      headers: {
-        "Content-Type": "application/json"
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
     })
     .then(() => {
-      statusMsg.style.color = "#16a34a";
-      statusMsg.textContent = "정상적으로 등록되었습니다!";
-      form.reset();
+      msg.textContent = "✅ 새 구글 스프레드시트에 성공적으로 저장되었습니다!";
+      msg.className = "success";
+      
+      document.getElementById("startKm").value = endKm;
+      document.getElementById("endKm").value = endKm;
+      document.getElementById("totalDistance").value = 0;
+      document.getElementById("fuelAmount").value = 0;
+      document.getElementById("fuelPrice").value = 0;
+      document.getElementById("fuelType").value = "없음";
+      document.getElementById("memo").value = "";
+      
       submitBtn.disabled = false;
+      submitBtn.textContent = "🚀 기록 저장하기";
+
+      setTimeout(fetchSheetData, 2000);
     })
     .catch((err) => {
-      statusMsg.style.color = "#dc2626";
-      statusMsg.textContent = "전송 실패: " + err.message;
+      msg.textContent = "❌ 전송 실패: " + err.message;
+      msg.className = "error";
       submitBtn.disabled = false;
+      submitBtn.textContent = "🚀 기록 저장하기";
     });
   });
 </script>
