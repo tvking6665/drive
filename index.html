@@ -8,152 +8,170 @@
     * { box-sizing: border-box; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Malgun Gothic", sans-serif;
-      background-color: #f1f5f9;
+      background-color: #0e1117;
+      color: #fafafa;
       margin: 0;
       padding: 16px;
       display: flex;
       justify-content: center;
-      color: #1e293b;
     }
     .container {
       width: 100%;
-      max-width: 580px;
-      background: #ffffff;
-      border-radius: 12px;
-      box-shadow: 0 4px 16px rgba(0,0,0,0.08);
-      padding: 20px;
+      max-width: 540px;
+      background: #0e1117;
+      padding: 10px;
     }
     .header {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      border-bottom: 2px solid #e2e8f0;
+      border-bottom: 1px solid #30363d;
       padding-bottom: 12px;
-      margin-bottom: 16px;
+      margin-bottom: 20px;
     }
-    .header h2 { margin: 0; font-size: 18px; color: #0f172a; }
+    .header h2 { margin: 0; font-size: 19px; font-weight: bold; color: #ffffff; }
     .btn-logout {
-      background: #ef4444;
-      color: white;
-      border: none;
-      padding: 6px 12px;
+      background: #30363d;
+      color: #f87171;
+      border: 1px solid #484f58;
+      padding: 5px 12px;
       border-radius: 6px;
       cursor: pointer;
-      font-size: 13px;
+      font-size: 12px;
       font-weight: bold;
     }
-    .form-group { margin-bottom: 14px; }
+    .form-group { margin-bottom: 16px; }
     label {
       display: block;
-      margin-bottom: 5px;
+      margin-bottom: 6px;
       font-size: 13px;
-      font-weight: bold;
-      color: #334155;
+      font-weight: 500;
+      color: #e6edf3;
     }
     input, select, textarea {
       width: 100%;
-      padding: 9px 12px;
-      border: 1px solid #cbd5e1;
-      border-radius: 6px;
+      padding: 10px 12px;
+      border: 1px solid #30363d;
+      border-radius: 8px;
       font-size: 14px;
-      background-color: #fff;
+      background-color: #21262d;
+      color: #ffffff;
     }
     input:focus, select:focus, textarea:focus {
       outline: none;
-      border-color: #2563eb;
-      box-shadow: 0 0 0 2px rgba(37,99,235,0.2);
+      border-color: #ff4b4b;
+      box-shadow: 0 0 0 1px #ff4b4b;
     }
-    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-    .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+    .sub-input { margin-top: 8px; }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+    
     .card-box {
-      background-color: #f8fafc;
-      border: 1px solid #e2e8f0;
-      border-radius: 8px;
-      padding: 12px;
-      margin-bottom: 14px;
+      background-color: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 10px;
+      padding: 14px;
+      margin-bottom: 18px;
     }
     .card-title {
       font-size: 14px;
       font-weight: bold;
-      color: #2563eb;
-      margin-bottom: 8px;
+      color: #f0f6fc;
+      margin-bottom: 10px;
     }
     .summary-text {
       font-size: 13px;
-      color: #475569;
-      background: #eff6ff;
-      border-left: 4px solid #2563eb;
-      padding: 8px 12px;
-      border-radius: 4px;
-      margin-bottom: 14px;
-      font-weight: 500;
+      color: #c9d1d9;
+      background: #161b22;
+      border-left: 4px solid #ff4b4b;
+      padding: 10px 14px;
+      border-radius: 6px;
+      margin-bottom: 18px;
+      font-weight: bold;
     }
     button[type="submit"], .btn-primary {
       width: 100%;
-      background: #2563eb;
+      background: #ff4b4b;
       color: white;
       border: none;
-      padding: 12px;
+      padding: 13px;
       border-radius: 8px;
       font-size: 15px;
       font-weight: bold;
       cursor: pointer;
+      transition: background 0.2s;
     }
-    button:disabled { background: #94a3b8; cursor: not-allowed; }
+    button[type="submit"]:hover { background: #e03e3e; }
+    button:disabled { background: #484f58; cursor: not-allowed; }
+
     #msg {
       margin-top: 14px;
-      padding: 10px;
+      padding: 12px;
       border-radius: 6px;
       text-align: center;
       font-size: 14px;
       font-weight: bold;
       display: none;
     }
-    .success { background-color: #dcfce7; color: #166534; display: block !important; }
-    .error { background-color: #fee2e2; color: #991b1b; display: block !important; }
-    .sub-input { margin-top: 6px; }
+    .success { background-color: #1b472e; color: #4ade80; display: block !important; }
+    .error { background-color: #4c1d1d; color: #f87171; display: block !important; }
 
-    /* 통계 및 기록 테이블 스타일 */
+    /* 통계 및 기록 테이블 UI */
     .section-divider {
       border: 0;
       height: 1px;
-      background: #cbd5e1;
-      margin: 24px 0 16px 0;
+      background: #30363d;
+      margin: 28px 0 20px 0;
     }
-    .table-title {
-      font-size: 15px;
+    .accordion {
+      background-color: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      margin-bottom: 14px;
+      overflow: hidden;
+    }
+    .accordion-header {
+      padding: 12px 16px;
+      cursor: pointer;
+      font-size: 14px;
       font-weight: bold;
-      color: #1e293b;
-      margin-bottom: 8px;
+      color: #58a6ff;
       display: flex;
-      align-items: center;
       justify-content: space-between;
+      align-items: center;
+      user-select: none;
+    }
+    .accordion-body {
+      padding: 14px;
+      border-top: 1px solid #30363d;
+      background-color: #0e1117;
     }
     table.data-table {
       width: 100%;
       border-collapse: collapse;
       font-size: 12px;
       text-align: center;
-      background: #fff;
+      color: #e6edf3;
     }
     table.data-table th, table.data-table td {
-      border: 1px solid #e2e8f0;
-      padding: 7px 4px;
+      border: 1px solid #30363d;
+      padding: 8px 5px;
     }
     table.data-table th {
-      background-color: #f1f5f9;
-      color: #334155;
+      background-color: #21262d;
+      color: #8b949e;
       font-weight: bold;
     }
     .table-scroll {
       overflow-x: auto;
       max-width: 100%;
       border-radius: 6px;
-      border: 1px solid #e2e8f0;
-      margin-bottom: 16px;
+      border: 1px solid #30363d;
+      margin-top: 10px;
     }
     .fuel-highlight {
-      background-color: #fffde7;
+      background-color: #3b3111 !important;
+      color: #fef08a !important;
       font-weight: bold;
     }
   </style>
@@ -163,8 +181,8 @@
 <div class="container">
 
   <!-- 1. 로그인 화면 -->
-  <div id="loginView">
-    <h2 style="text-align: center; margin-top: 0; margin-bottom: 20px;">🔐 전우정밀 시스템 로그인</h2>
+  <div id="loginView" style="margin-top: 40px;">
+    <h2 style="text-align: center; margin-bottom: 24px;">🔐 전우정밀 시스템 로그인</h2>
     <div class="form-group">
       <label>사용자 선택</label>
       <select id="loginUser">
@@ -182,15 +200,11 @@
     <button type="button" class="btn-primary" onclick="handleLogin()">로그인</button>
   </div>
 
-  <!-- 2. 운행일지 메인 화면 -->
+  <!-- 2. 운행일지 작성 메인 화면 -->
   <div id="mainView" style="display: none;">
     <div class="header">
-      <h2>차량 운행/주유 기록부 (<span id="userBadge" style="color: #2563eb;"></span>)</h2>
+      <h2>차량 운행 및 주유 기록부 (<span id="userBadge" style="color: #58a6ff;"></span>님)</h2>
       <button class="btn-logout" onclick="handleLogout()">로그아웃</button>
-    </div>
-
-    <div class="summary-text" id="routeSummary">
-      선택 차량: - | 출발: 회사 ➔ 도착: 왜관(VPHC)
     </div>
 
     <form id="vehicleForm">
@@ -217,32 +231,32 @@
       <div class="form-group">
         <label>🚗 차량 선택</label>
         <select id="carKey" onchange="onCarChange()">
-          <option value="7.5톤">7.5톤(파비스) 3528</option>
-          <option value="2.5톤">2.5톤(마이티) 8569</option>
-          <option value="1톤">1톤(포터) 5378</option>
-          <option value="통근차">통근차(솔라티) 8740</option>
+          <option value="7.5톤">7.5톤</option>
+          <option value="2.5톤">2.5톤</option>
+          <option value="1톤">1톤</option>
+          <option value="통근차">통근차</option>
         </select>
       </div>
 
       <!-- 출발지 및 목적지 -->
       <div class="grid-2">
         <div class="form-group">
-          <label>📍 출발지</label>
+          <label>📍 출발지 선택</label>
           <select id="startSelect" onchange="updateSummary()">
             <option value="회사(전우정밀)">회사</option>
             <option value="통근노선 시작">통근노선 시작</option>
           </select>
-          <input type="text" id="startCustom" class="sub-input" placeholder="직접 입력" oninput="updateSummary()">
+          <input type="text" id="startCustom" class="sub-input" placeholder="✍️ [기타 장소] 출발지 직접 입력" oninput="updateSummary()">
         </div>
         <div class="form-group">
-          <label>🎯 목적지</label>
+          <label>🎯 목적지 선택</label>
           <select id="endSelect" onchange="updateSummary()">
             <option value="왜관(VPHC)">왜관(VPHC)</option>
             <option value="AST(2공장)">AST(2공장)</option>
             <option value="동아금속">동아금속</option>
             <option value="통근노선 종점">통근노선 종점</option>
           </select>
-          <input type="text" id="endCustom" class="sub-input" placeholder="직접 입력" oninput="updateSummary()">
+          <input type="text" id="endCustom" class="sub-input" placeholder="✍️ [기타 장소] 목적지 직접 입력" oninput="updateSummary()">
         </div>
       </div>
 
@@ -259,21 +273,25 @@
         </select>
       </div>
 
+      <div class="summary-text" id="routeSummary">
+        선택 차량: - | 출발: 회사 ➔ 도착: 왜관(VPHC)
+      </div>
+
       <!-- 주행 거리 박스 -->
       <div class="card-box">
         <div class="card-title">🛣️ 주행거리 산출 (km)</div>
         <div class="grid-3">
           <div>
-            <label style="font-size: 11px;">시작거리</label>
+            <label style="font-size: 11px;">📍 시작거리</label>
             <input type="number" id="startKm" value="0" oninput="calcDistance()" required>
           </div>
           <div>
-            <label style="font-size: 11px;">종료거리</label>
+            <label style="font-size: 11px;">🏁 종료거리</label>
             <input type="number" id="endKm" value="0" oninput="calcDistance()" required>
           </div>
           <div>
             <label style="font-size: 11px;">주행거리</label>
-            <input type="number" id="totalDistance" value="0" readonly style="background: #e2e8f0; font-weight: bold;">
+            <input type="number" id="totalDistance" value="0" readonly style="background: #30363d; font-weight: bold; color: #58a6ff;">
           </div>
         </div>
       </div>
@@ -296,7 +314,7 @@
             <input type="number" id="fuelAmount" min="0" value="0">
           </div>
           <div>
-            <label style="font-size: 11px;">금액 (원)</label>
+            <label style="font-size: 11px;">결제 금액 (원)</label>
             <input type="number" id="fuelPrice" min="0" value="0" step="1000">
           </div>
         </div>
@@ -304,67 +322,84 @@
 
       <!-- 비고 -->
       <div class="form-group">
-        <label>📝 특이사항 (비고)</label>
-        <textarea id="memo" rows="2" placeholder="차량 이상 증상, 주유 내역 등 입력"></textarea>
+        <label>📝 비고(특이사항)</label>
+        <textarea id="memo" rows="2" placeholder="특이사항 내용을 입력하세요 (예: 주유 정산 필요, 소음 발생 등)"></textarea>
       </div>
 
-      <button type="submit" id="submitBtn">🚀 기록 저장하기</button>
+      <button type="submit" id="submitBtn">🚀 기록 저장</button>
     </form>
 
     <div id="msg"></div>
 
-    <!-- 하단 통계 및 최근 기록 뷰어 -->
     <hr class="section-divider">
 
-    <!-- 1. 월별 차량 누적 요약 표 -->
-    <div class="table-title">
-      <span>📊 차량별 월간 누적 요약</span>
-      <select id="summaryMonth" style="width: auto; padding: 4px 8px; font-size: 13px;" onchange="renderSummaryTable()">
-      </select>
-    </div>
-    <div class="table-scroll">
-      <table class="data-table" id="summaryTable">
-        <thead>
-          <tr>
-            <th>차종</th>
-            <th>주행거리</th>
-            <th>LPG금액</th>
-            <th>경유주입량</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr><td colspan="4" style="padding: 12px;">데이터를 불러오는 중입니다...</td></tr>
-        </tbody>
-      </table>
+    <!-- 1. 월별 차량 누적 요약 아코디언 -->
+    <div class="accordion">
+      <div class="accordion-header" onclick="toggleSection('summaryBody', 'summaryArrow')">
+        <span>📊 차량별 누적 요약 표 보기 (주행거리 / LPG금액 / 경유주입량)</span>
+        <span id="summaryArrow">▼</span>
+      </div>
+      <div class="accordion-body" id="summaryBody">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <span style="font-size: 13px; font-weight: bold; color: #c9d1d9;">조회할 월 선택:</span>
+          <select id="summaryMonth" style="width: auto; padding: 4px 8px; font-size: 13px;" onchange="renderSummaryTable()">
+          </select>
+        </div>
+        <div class="table-scroll">
+          <table class="data-table" id="summaryTable">
+            <thead>
+              <tr>
+                <th>차종</th>
+                <th>주행거리</th>
+                <th>LPG금액</th>
+                <th>경유주입량</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td colspan="4" style="padding: 12px;">데이터를 불러오는 중입니다...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
 
-    <!-- 2. 최근 운행 및 주유 기록 보기 -->
-    <div class="table-title" style="margin-top: 20px;">
-      <span>📋 최근 운행/주유 기록 (최근 5건)</span>
-      <select id="historyFilter" style="width: auto; padding: 4px 8px; font-size: 13px;" onchange="renderHistoryTable()">
-        <option value="전체 보기">전체 보기</option>
-        <option value="7.5톤">7.5톤</option>
-        <option value="2.5톤">2.5톤</option>
-        <option value="1톤">1톤</option>
-        <option value="통근차">통근차</option>
-      </select>
-    </div>
-    <div class="table-scroll">
-      <table class="data-table" id="historyTable">
-        <thead>
-          <tr>
-            <th>날짜</th>
-            <th>운전자</th>
-            <th>주행</th>
-            <th>구간</th>
-            <th>내용</th>
-            <th>주유/비고</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr><td colspan="6" style="padding: 12px;">표시할 기록이 없습니다.</td></tr>
-        </tbody>
-      </table>
+    <!-- 2. 최근 운행 및 주유 기록 보기 아코디언 -->
+    <div class="accordion">
+      <div class="accordion-header" onclick="toggleSection('historyBody', 'historyArrow')">
+        <span>📋 최근 운행 및 주유 기록 보기</span>
+        <span id="historyArrow">▼</span>
+      </div>
+      <div class="accordion-body" id="historyBody">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <span style="font-size: 13px; font-weight: bold; color: #c9d1d9;">조회할 차량 선택:</span>
+          <select id="historyFilter" style="width: auto; padding: 4px 8px; font-size: 13px;" onchange="renderHistoryTable()">
+            <option value="전체 보기">전체 보기</option>
+            <option value="7.5톤">7.5톤</option>
+            <option value="2.5톤">2.5톤</option>
+            <option value="1톤">1톤</option>
+            <option value="통근차">통근차</option>
+          </select>
+        </div>
+        <div class="table-scroll">
+          <table class="data-table" id="historyTable">
+            <thead>
+              <tr>
+                <th>날짜</th>
+                <th>운전자</th>
+                <th>주행</th>
+                <th>시작</th>
+                <th>종료</th>
+                <th>구간</th>
+                <th>운행내용</th>
+                <th>주유/비고</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td colspan="8" style="padding: 12px;">기록을 불러오는 중입니다...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
 
   </div>
@@ -372,13 +407,22 @@
 </div>
 
 <script>
-  // 1. 구글 스프레드시트 및 웹앱 연동 정보
-  const SHEET_ID = "1ZiLamZZuSsHZtO00fa8-bKPSVYfCiKMhtZOddU7O49o";
-  const CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=0`;
+  // 1. 구글 연동 정보: 저장(새 웹앱), 조회(기존 누적 데이터 시트)
+  // 저장 주소: 새로 발급받은 Apps Script 웹앱
   const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyq0yIctzaAByhpLPR2skU2sNouES6VoxbKbN3GwL6wuDo_P-KrucCGOkQpsdZsc-BA_g/exec";
+  
+  // 조회 주소: 기존 데이터가 누적되어 있는 시트에서 최신 시작거리와 과거 통계를 실시간으로 읽어옵니다.
+  const READ_SHEET_ID = "1_4z6RBNn8HQ1_xfznsITZ0yGWu5xpP-BYDmOdi_ftaE";
+  const CSV_URL = `https://docs.google.com/spreadsheets/d/${READ_SHEET_ID}/export?format=csv&gid=0`;
 
   // 2. 사원 계정 & 기본 맵핑 데이터
   const USER_PW = { "관리자": "1111", "김현준": "0000", "김동현": "0000", "이학장": "0000" };
+  const CAR_MAP = {
+    "7.5톤": "7.5톤(파비스)",
+    "2.5톤": "2.5톤(마이티)",
+    "1톤": "1톤(포터)",
+    "통근차": "통근차(솔라티)"
+  };
   const CAR_FULL_NAME = {
     "7.5톤": "7.5톤(파비스) 3528",
     "2.5톤": "2.5톤(마이티) 8569",
@@ -390,10 +434,26 @@
   let currentUser = "";
   let sheetHistoryData = [];
 
-  // 초기 날짜 설정
-  document.getElementById("driveDate").valueAsDate = new Date();
+  // 초기 날짜 (오늘 한국 시간)
+  const today = new Date();
+  const yyyy = today.getFullYear();
+  const mm = String(today.getMonth() + 1).padStart(2, '0');
+  const dd = String(today.getDate()).padStart(2, '0');
+  document.getElementById("driveDate").value = `${yyyy}-${mm}-${dd}`;
 
-  // 구글 시트 데이터 실시간 동기화
+  function toggleSection(bodyId, arrowId) {
+    const body = document.getElementById(bodyId);
+    const arrow = document.getElementById(arrowId);
+    if (body.style.display === "none") {
+      body.style.display = "block";
+      arrow.textContent = "▼";
+    } else {
+      body.style.display = "none";
+      arrow.textContent = "▶";
+    }
+  }
+
+  // 실시간 시트 데이터 로드
   function fetchSheetData() {
     fetch(`${CSV_URL}&_ts=${new Date().getTime()}`)
       .then(res => res.text())
@@ -415,17 +475,14 @@
           onCarChange();
         }
       })
-      .catch(err => console.log("시트 동기화 중...", err));
+      .catch(err => console.log("시트 동기화 대기 중..."));
   }
 
-  // 월 선택 드롭다운 생성
   function initMonthSelect() {
     const monthSelect = document.getElementById("summaryMonth");
     const months = new Set();
-    
-    // 현재 월 기본 추가
-    const nowMonth = new Date().toISOString().slice(0, 7);
-    months.add(nowMonth);
+    const currentMonthStr = `${yyyy}-${mm}`;
+    months.add(currentMonthStr);
 
     sheetHistoryData.forEach(r => {
       if (r["날짜"] && r["날짜"].length >= 7) {
@@ -437,11 +494,9 @@
     monthSelect.innerHTML = sortedMonths.map(m => `<option value="${m}">${m}</option>`).join('');
   }
 
-  // 월간 누적 요약 표 렌더링
   function renderSummaryTable() {
     const targetMonth = document.getElementById("summaryMonth").value;
     const tbody = document.querySelector("#summaryTable tbody");
-
     const filtered = sheetHistoryData.filter(r => r["날짜"] && r["날짜"].startsWith(targetMonth));
 
     const carKeys = ["7.5톤", "2.5톤", "1톤", "통근차"];
@@ -449,19 +504,18 @@
 
     carKeys.forEach(key => {
       const carRows = filtered.filter(r => r["차량"] && r["차량"].includes(key));
-      
       const totalKm = carRows.reduce((acc, cur) => acc + (Number(cur["주행거리"]) || 0), 0);
       
       const lpgPrice = carRows
-        .filter(r => r["연료종류"] === "LPG")
+        .filter(r => r["연료종류"] && r["연료종류"].trim() === "LPG")
         .reduce((acc, cur) => acc + (Number(cur["결제금액"]) || 0), 0);
 
       const dieselLiters = carRows
-        .filter(r => r["연료종류"] === "경유")
+        .filter(r => r["연료종류"] && r["연료종류"].trim() === "경유")
         .reduce((acc, cur) => acc + (Number(cur["주입량"]) || 0), 0);
 
       html += `<tr>
-        <td style="font-weight: 500;">${CAR_FULL_NAME[key].split(' ')[0]}</td>
+        <td style="font-weight: 500;">${CAR_MAP[key]}</td>
         <td>${totalKm > 0 ? totalKm.toLocaleString() + ' km' : '0 km'}</td>
         <td>${lpgPrice > 0 ? lpgPrice.toLocaleString() + ' 원' : '-'}</td>
         <td>${dieselLiters > 0 ? dieselLiters.toLocaleString() + ' L' : '-'}</td>
@@ -471,7 +525,6 @@
     tbody.innerHTML = html;
   }
 
-  // 최근 기록 5건 렌더링
   function renderHistoryTable() {
     const filter = document.getElementById("historyFilter").value;
     const tbody = document.querySelector("#historyTable tbody");
@@ -482,16 +535,15 @@
     }
 
     if (filtered.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="6" style="padding: 12px;">표시할 기록이 없습니다.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="8" style="padding: 12px;">표시할 기록이 없습니다.</td></tr>`;
       return;
     }
 
-    // 최근 5건 역순 정렬
     const recentRows = filtered.slice(-5).reverse();
     let html = "";
 
     recentRows.forEach(r => {
-      const isFuel = r["연료종류"] && r["연료종류"] !== "없음" && r["연료종류"] !== "";
+      const isFuel = r["연료종류"] && r["연료종류"].trim() !== "" && r["연료종류"].trim() !== "없음";
       const rowClass = isFuel ? "fuel-highlight" : "";
       
       let fuelMemo = [];
@@ -504,7 +556,9 @@
       html += `<tr class="${rowClass}">
         <td>${r["날짜"] || ""}</td>
         <td>${r["운전자"] || ""}</td>
-        <td><b>${Number(r["주행거리"] || 0).toLocaleString()}km</b></td>
+        <td style="font-weight: bold; color: #58a6ff;">${Number(r["주행거리"] || 0).toLocaleString()} km</td>
+        <td>${Number(r["시작거리"] || 0).toLocaleString()}</td>
+        <td>${Number(r["종료거리"] || 0).toLocaleString()}</td>
         <td>${(r["출발지"]||"").replace("회사(전우정밀)","회사")} ➔ ${(r["목적지"]||"")}</td>
         <td>${r["운행내용"] || ""}</td>
         <td>${fuelMemo.join(' / ') || "-"}</td>
@@ -519,7 +573,7 @@
     const pw = document.getElementById("loginPw").value;
 
     if (!user) {
-      alert("사용자를 선택해주세요.");
+      alert("사용자를 먼저 선택해주세요.");
       return;
     }
     if (USER_PW[user] !== pw) {
@@ -576,6 +630,7 @@
     updateSummary();
     const carKey = document.getElementById("carKey").value;
 
+    // 해당 차량의 가장 마지막 종료거리를 찾아 시작거리에 자동 반영
     const carRows = sheetHistoryData.filter(r => r["차량"] && r["차량"].includes(carKey));
     if (carRows.length > 0) {
       const lastRow = carRows[carRows.length - 1];
@@ -672,16 +727,16 @@
       document.getElementById("memo").value = "";
       
       submitBtn.disabled = false;
-      submitBtn.textContent = "🚀 기록 저장하기";
+      submitBtn.textContent = "🚀 기록 저장";
 
-      // 2초 후 실시간 표 갱신
+      // 잠시 후 화면 표 갱신
       setTimeout(fetchSheetData, 2000);
     })
     .catch((err) => {
       msg.textContent = "❌ 전송 실패: " + err.message;
       msg.className = "error";
       submitBtn.disabled = false;
-      submitBtn.textContent = "🚀 기록 저장하기";
+      submitBtn.textContent = "🚀 기록 저장";
     });
   });
 </script>
