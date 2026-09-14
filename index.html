@@ -180,13 +180,13 @@
     table.custom-table tr:hover { background-color: #161a23; }
     
     .fuel-highlight {
-      background-color: #fff9c4 !important;
-      color: #000000 !important;
+      background-color: #3b3111 !important;
+      color: #fef08a !important;
       font-weight: bold;
     }
     .fuel-highlight td {
-      color: #000000 !important;
-      border-bottom: 1px solid #e0d890 !important;
+      color: #fef08a !important;
+      border-bottom: 1px solid #524419 !important;
     }
 
     /* 스트림릿 아코디언 */
@@ -365,11 +365,11 @@
 
     <!-- 하단 통계 섹션 (스트림릿 동일 UI) -->
     <label class="checkbox-wrap">
-      <input type="checkbox" id="showSummaryChk" onchange="toggleSummaryBox(this.checked)">
+      <input type="checkbox" id="showSummaryChk" checked onchange="toggleSummaryBox(this.checked)">
       <span>📊 차량별 누적 요약 표 보기 (주행거리 / LPG금액 / 경유주입량)</span>
     </label>
 
-    <div id="summarySection" style="display: none;">
+    <div id="summarySection">
       <div class="streamlit-box">
         <label style="font-size: 13px; font-weight: 500; margin-bottom: 6px;">📅 조회할 월을 선택하세요</label>
         <select id="summaryMonthSelect" onchange="renderSummaryTable()">
@@ -469,7 +469,31 @@
   const dd = String(today.getDate()).padStart(2, '0');
   document.getElementById("driveDate").value = `${yyyy}-${mm}-${dd}`;
 
-  // CORS 방지: Google Sheets JSONP(tqx=out:json) 로딩 방식
+  // 날짜 파싱 보정 함수 (Date(2026,8,11) 형태 및 일반 문자열 대응)
+  function parseDateString(val) {
+    if (!val) return "";
+    let s = String(val).trim();
+    if (s.startsWith("Date(") && s.endsWith(")")) {
+      const parts = s.replace("Date(", "").replace(")", "").split(",");
+      if (parts.length >= 3) {
+        const y = parts[0].trim();
+        const m = String(Number(parts[1].trim()) + 1).padStart(2, '0');
+        const d = String(parts[2].trim()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+      }
+    }
+    return s.slice(0, 10);
+  }
+
+  // 숫자 파싱 함수 (콤마 및 서식 제거)
+  function parseNumber(val) {
+    if (val === null || val === undefined || val === "") return 0;
+    const cleaned = String(val).replace(/[^0-9.-]+/g, "");
+    const n = Number(cleaned);
+    return isNaN(n) ? 0 : n;
+  }
+
+  // 구글 시트 데이터 로드
   function loadSheetData() {
     const callbackName = "handleGvizData_" + Math.floor(Math.random() * 1000000);
     window[callbackName] = function(json) {
@@ -482,9 +506,29 @@
         r.c.forEach((cell, idx) => {
           const colName = cols[idx];
           if (colName) {
-            rowObj[colName] = cell ? (cell.v !== null ? cell.v : "") : "";
+            // cell.f(포맷된 문자열)가 있으면 우선 사용, 없으면 cell.v 사용
+            let val = "";
+            if (cell) {
+              val = (cell.f !== undefined && cell.f !== null) ? cell.f : (cell.v !== null ? cell.v : "");
+            }
+            rowObj[colName] = val;
           }
         });
+
+        // 날짜 정상 변환
+        rowObj["날짜"] = parseDateString(rowObj["날짜"]);
+
+        // 시작/종료 거리 기반으로 주행거리가 비어있거나 0이면 자동 산출
+        const startK = parseNumber(rowObj["시작거리"]);
+        const endK = parseNumber(rowObj["종료거리"]);
+        let dist = parseNumber(rowObj["주행거리"]);
+        if (dist === 0 && endK > startK) {
+          dist = endK - startK;
+        }
+        rowObj["_시작거리"] = startK;
+        rowObj["_종료거리"] = endK;
+        rowObj["_주행거리"] = dist;
+
         return rowObj;
       });
 
@@ -528,15 +572,15 @@
       const displayName = CAR_MAP[carKey];
       const carData = filtered.filter(r => String(r["차량"] || "").includes(carKey));
 
-      const totalDist = carData.reduce((acc, cur) => acc + (Number(cur["주행거리"]) || 0), 0);
+      const totalDist = carData.reduce((acc, cur) => acc + cur["_주행거리"], 0);
       
       const lpgPrice = carData
         .filter(r => String(r["연료종류"] || "").trim() === "LPG")
-        .reduce((acc, cur) => acc + (Number(cur["결제금액"]) || 0), 0);
+        .reduce((acc, cur) => acc + parseNumber(cur["결제금액"]), 0);
 
       const dieselLiters = carData
         .filter(r => String(r["연료종류"] || "").trim() === "경유")
-        .reduce((acc, cur) => acc + (Number(cur["주입량"]) || 0), 0);
+        .reduce((acc, cur) => acc + parseNumber(cur["주입량"]), 0);
 
       html += `<tr>
         <td>${displayName}</td>
@@ -572,9 +616,9 @@
       const isFuel = fuelType !== "" && fuelType !== "없음";
       const rowClass = isFuel ? "fuel-highlight" : "";
 
-      const dist = Number(r["주행거리"]) || 0;
-      const start = Number(r["시작거리"]) || 0;
-      const end = Number(r["종료거리"]) || 0;
+      const dist = r["_주행거리"];
+      const start = r["_시작거리"];
+      const end = r["_종료거리"];
       const startNode = (String(r["출발지"] || "")).replace("회사(전우정밀)", "회사");
 
       html += `<tr class="${rowClass}">
@@ -677,7 +721,7 @@
     const carRows = sheetRows.filter(r => String(r["차량"] || "").includes(carKey));
     if (carRows.length > 0) {
       const lastRow = carRows[carRows.length - 1];
-      const lastKm = Number(lastRow["종료거리"]) || 0;
+      const lastKm = lastRow["_종료거리"] || 0;
       if (lastKm > 0) {
         document.getElementById("startKm").value = lastKm;
         document.getElementById("endKm").value = lastKm;
@@ -772,7 +816,6 @@
       submitBtn.disabled = false;
       submitBtn.textContent = "🚀 기록 저장";
 
-      // 2초 후 실시간 표 갱신
       setTimeout(loadSheetData, 2000);
     })
     .catch((err) => {
